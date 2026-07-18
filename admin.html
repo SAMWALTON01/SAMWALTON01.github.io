@@ -1,1 +1,438 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>נחמן | דשבורד קמפיינים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00a884; --green-dark: #008f6f; --bg: #f0f2f5; --card: #fff;
+    --text: #111b21; --sub: #667781; --red: #d32f2f; --border: #e4e6eb;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Heebo', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-card { background: var(--card); border-radius: 16px; padding: 40px; width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,.08); text-align: center; }
+  .login-card .logo { width: 64px; height: 64px; border-radius: 50%; background: var(--green); color: #fff; font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+  .login-card h1 { font-size: 20px; margin-bottom: 4px; }
+  .login-card p { color: var(--sub); font-size: 14px; margin-bottom: 24px; }
+  .login-card input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 15px; margin-bottom: 12px; outline: none; }
+  .login-card input:focus { border-color: var(--green); }
+  .login-card button { width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--green); color: #fff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .login-card button:hover { background: var(--green-dark); }
+  .login-err { color: var(--red); font-size: 13px; margin-top: 10px; display: none; }
+  #app { display: none; max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .topbar .brand { display: flex; align-items: center; gap: 10px; }
+  .topbar .brand .logo { width: 40px; height: 40px; border-radius: 50%; background: var(--green); color: #fff; font-weight: 700; font-size: 19px; display: flex; align-items: center; justify-content: center; }
+  .topbar h1 { font-size: 19px; }
+  #logoutBtn { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 14px; font-family: inherit; font-size: 13px; color: var(--sub); cursor: pointer; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--card); padding: 6px; border-radius: 12px; width: fit-content; }
+  .tab { border: none; background: none; padding: 9px 20px; border-radius: 8px; font-family: inherit; font-size: 15px; font-weight: 500; color: var(--sub); cursor: pointer; }
+  .tab.active { background: var(--green); color: #fff; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: var(--card); border-radius: 14px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 16px; }
+  .card h2 { font-size: 17px; margin-bottom: 16px; }
+  label { display: block; font-size: 13.5px; font-weight: 500; margin-bottom: 6px; color: var(--text); }
+  input[type=text], textarea, select { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 14.5px; outline: none; background: #fff; }
+  input[type=text]:focus, textarea:focus { border-color: var(--green); }
+  textarea { resize: vertical; line-height: 1.6; }
+  .field { margin-bottom: 16px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .row2 { grid-template-columns: 1fr; } }
+  .hint { font-size: 12.5px; color: var(--sub); margin-top: 5px; }
+  .btn { border: none; border-radius: 10px; padding: 12px 24px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-secondary { background: #eef2f5; color: var(--text); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  #recipStats { display: flex; gap: 14px; margin: 10px 0; font-size: 14px; flex-wrap: wrap; }
+  .stat-pill { background: #eef2f5; border-radius: 20px; padding: 5px 14px; }
+  .stat-pill.ok { background: #e3f5ef; color: var(--green-dark); font-weight: 600; }
+  .stat-pill.bad { background: #fdecea; color: var(--red); }
+  #previewBox { background: #f7f9fa; border: 1px dashed var(--border); border-radius: 10px; padding: 14px; font-size: 14px; white-space: pre-line; margin-top: 8px; }
+  #sendProgress { display: none; margin-top: 16px; }
+  .prog-track { height: 10px; background: #eef2f5; border-radius: 6px; overflow: hidden; }
+  .prog-fill { height: 100%; background: var(--green); width: 0%; transition: width .3s; }
+  #sendLog { font-size: 13px; color: var(--sub); margin-top: 10px; max-height: 180px; overflow-y: auto; white-space: pre-line; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: right; padding: 10px 12px; color: var(--sub); font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #fafbfc; }
+  .table-wrap { overflow-x: auto; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge.green { background: #e3f5ef; color: var(--green-dark); }
+  .badge.gray { background: #eef2f5; color: var(--sub); }
+  .badge.red { background: #fdecea; color: var(--red); }
+  .num { font-weight: 700; }
+  .empty { text-align: center; color: var(--sub); padding: 40px; font-size: 14px; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+  .toolbar select { width: auto; min-width: 220px; }
+  .toolbar .spacer { flex: 1; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #222; color: #fff; padding: 12px 24px; border-radius: 24px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 99; }
+  .toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo">נ</div>
+    <h1>דשבורד קמפיינים</h1>
+    <p>נחמן | ניהול סמסים ולידים</p>
+    <input type="password" id="pwdInput" placeholder="סיסמה" autocomplete="current-password">
+    <button onclick="doLogin()">כניסה</button>
+    <div class="login-err" id="loginErr">סיסמה שגויה, נסה שוב</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">נ</div><h1>דשבורד קמפיינים</h1></div>
+    <button id="logoutBtn" onclick="doLogout()">יציאה</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="send" onclick="switchTab('send')">📤 שליחת קמפיין</button>
+    <button class="tab" data-tab="campaigns" onclick="switchTab('campaigns')">📈 קמפיינים</button>
+    <button class="tab" data-tab="leads" onclick="switchTab('leads')">👥 לידים</button>
+  </div>
+
+  <div class="panel active" id="panel-send">
+    <div class="card">
+      <h2>רשימת נמענים</h2>
+      <div class="field">
+        <label>הדבק נמענים (שורה לכל אחד: טלפון, שם) או העלה קובץ CSV</label>
+        <textarea id="recipInput" rows="6" placeholder="0501234567, ישראל כהן&#10;0527654321, דנה לוי&#10;0541112222"></textarea>
+        <div class="hint">פורמטים נתמכים: <code>טלפון, שם</code> / <code>טלפון שם</code> / טלפון בלבד • עד 10,000 נמענים</div>
+      </div>
+      <div class="field">
+        <input type="file" id="fileInput" accept=".csv,.txt" style="display:none" onchange="loadFile(event)">
+        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📁 העלאת קובץ</button>
+      </div>
+      <div id="recipStats"></div>
+    </div>
+
+    <div class="card">
+      <h2>הודעה</h2>
+      <div class="row2">
+        <div class="field">
+          <label>שם שולח (Sender ID מאושר)</label>
+          <input type="text" id="senderInput" value="nahman">
+        </div>
+        <div class="field">
+          <label>שם קמפיין (למעקב)</label>
+          <input type="text" id="campaignInput">
+        </div>
+      </div>
+      <div class="field">
+        <label>נוסח ההודעה</label>
+        <textarea id="msgInput" rows="5">שלום [#FirstName#],
+בדיקת זכאות מהירה להלוואה בתנאים מועדפים — ללא התחייבות:
+[#Representative#]
+להסרה השב: הסר</textarea>
+        <div class="hint"><code>[#FirstName#]</code> = שם הנמען • <code>[#Representative#]</code> = הלינק האישי (חובה לכלול!) • שורת ההסרה נדרשת בחוק</div>
+      </div>
+      <div class="field">
+        <label>תצוגה מקדימה (נמען ראשון)</label>
+        <div id="previewBox">—</div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="dryBtn" onclick="dryRun()">🧪 בדיקה (לא שולח)</button>
+        <button class="btn btn-primary" id="sendBtn" onclick="sendCampaign()">🚀 שגר קמפיין</button>
+      </div>
+      <div id="sendProgress">
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+        <div id="sendLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-campaigns">
+    <div class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">קמפיינים</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="loadCampaigns()">🔄 רענן</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>קמפיין</th><th>תאריך</th><th>שולח</th><th>נשלחו</th><th>לחיצות</th><th>לוחצים יחידים</th><th>לידים</th><th>CTR</th>
+          </tr></thead>
+          <tbody id="campaignsBody"><tr><td colspan="8" class="empty">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-leads">
+    <div class="card">
+      <div class="toolbar">
+        <select id="leadCampaignFilter" onchange="loadLeads()">
+          <option value="">כל הלידים</option>
+        </select>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="loadLeads()">🔄 רענן</button>
+        <button class="btn btn-primary" onclick="exportLeads()">⬇️ ייצוא לאקסל</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>תאריך</th><th>שם</th><th>טלפון</th><th>סיכום</th><th>החזר מס</th><th>הושלם</th>
+          </tr></thead>
+          <tbody id="leadsBody"><tr><td colspan="6" class="empty">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA = 'https://dgmygsvwemgtnvmdnwnz.supabase.co';
+const FN_SEND = `${SUPA}/functions/v1/send-sms-campaign`;
+const FN_ADMIN = `${SUPA}/functions/v1/admin-api`;
+let TOKEN = sessionStorage.getItem('nahman_admin') || '';
+let recipients = [];
+
+function doLogin() {
+  TOKEN = document.getElementById('pwdInput').value.trim();
+  api(FN_ADMIN, { action: 'campaigns' })
+    .then(() => {
+      sessionStorage.setItem('nahman_admin', TOKEN);
+      showApp();
+    })
+    .catch(() => { document.getElementById('loginErr').style.display = 'block'; });
+}
+function doLogout() { sessionStorage.removeItem('nahman_admin'); location.reload(); }
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('campaignInput').value = 'camp_' + new Date().toISOString().slice(0, 10);
+  loadCampaigns(); loadLeads();
+}
+async function api(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) throw new Error('unauthorized');
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'campaigns') loadCampaigns();
+  if (name === 'leads') loadLeads();
+}
+
+function parseRecipients(text) {
+  const out = []; const bad = [];
+  for (let line of text.split('\n')) {
+    line = line.trim();
+    if (!line) continue;
+    let phone = '', name = '';
+    const comma = line.split(/[,;\t]/);
+    if (comma.length >= 2) {
+      phone = comma[0].trim();
+      name = comma.slice(1).join(' ').trim();
+    } else {
+      const m = line.match(/^(\S+)\s+(.*)$/);
+      if (m && /^[\d+\-]/.test(m[1])) { phone = m[1]; name = m[2].trim(); }
+      else phone = line;
+    }
+    let d = phone.replace(/\D/g, '');
+    if (d.startsWith('972')) d = '0' + d.slice(3);
+    if (d.length === 9 && d.startsWith('5')) d = '0' + d;
+    if (/^05\d{8}$/.test(d)) out.push({ phone: d, name });
+    else bad.push(line);
+  }
+  const seen = new Set();
+  const dedup = out.filter(r => seen.has(r.phone) ? false : (seen.add(r.phone), true));
+  return { valid: dedup, bad, dups: out.length - dedup.length };
+}
+function refreshRecipStats() {
+  const { valid, bad, dups } = parseRecipients(document.getElementById('recipInput').value);
+  recipients = valid;
+  const el = document.getElementById('recipStats');
+  el.innerHTML = valid.length || bad.length
+    ? `<span class="stat-pill ok">✅ ${valid.length} תקינים</span>` +
+      (dups ? `<span class="stat-pill">🔁 ${dups} כפולים הוסרו</span>` : '') +
+      (bad.length ? `<span class="stat-pill bad">⚠️ ${bad.length} לא תקינים (ידולג)</span>` : '')
+    : '';
+  refreshPreview();
+  return valid.length;
+}
+function loadFile(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let text = reader.result;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    document.getElementById('recipInput').value = text;
+    refreshRecipStats();
+    toast('הקובץ נטען');
+  };
+  reader.readAsText(f, 'utf-8');
+}
+
+function buildLink(r, campaign) {
+  const p = new URLSearchParams();
+  p.set('p', r.phone);
+  if (r.name) p.set('n', r.name);
+  p.set('c', campaign);
+  return `${location.origin}/?${p.toString()}`;
+}
+function refreshPreview() {
+  const msg = document.getElementById('msgInput').value;
+  const campaign = document.getElementById('campaignInput').value.trim() || 'camp';
+  const r = recipients[0] || { phone: '0501234567', name: 'ישראל' };
+  const link = buildLink(r, campaign);
+  document.getElementById('previewBox').textContent =
+    msg.replaceAll('[#FirstName#]', r.name || '').replaceAll('[#Representative#]', link);
+}
+
+function getCampaignConfig() {
+  return {
+    sender: document.getElementById('senderInput').value.trim() || 'nahman',
+    campaign: document.getElementById('campaignInput').value.trim() || ('camp_' + Date.now()),
+    message: document.getElementById('msgInput').value,
+  };
+}
+async function dryRun() {
+  if (!refreshRecipStats()) { toast('אין נמענים תקינים'); return; }
+  const cfg = getCampaignConfig();
+  if (!cfg.message.includes('[#Representative#]')) { toast('חובה לכלול [#Representative#] בהודעה'); return; }
+  const btn = document.getElementById('dryBtn'); btn.disabled = true;
+  try {
+    const res = await api(FN_SEND, { ...cfg, recipients: recipients.slice(0, 5), dryRun: true });
+    toast(`✅ תקין: ${res.valid} נמענים יעבדו, ${res.skipped.length} ידולגו`);
+    log(`🧪 בדיקה: ${res.valid} תקינים. לינק לדוגמה:\n${res.sampleLink}`);
+  } catch (e) { toast('שגיאה בבדיקה'); }
+  btn.disabled = false;
+}
+function log(line) {
+  document.getElementById('sendProgress').style.display = 'block';
+  document.getElementById('sendLog').textContent += line + '\n';
+}
+async function sendCampaign() {
+  const total = refreshRecipStats();
+  if (!total) { toast('אין נמענים תקינים'); return; }
+  const cfg = getCampaignConfig();
+  if (!cfg.message.includes('[#Representative#]')) { toast('חובה לכלול [#Representative#] בהודעה'); return; }
+  if (!confirm(`לשגר ${total} סמסים בקמפיין "${cfg.campaign}"?`)) return;
+
+  const btn = document.getElementById('sendBtn'); btn.disabled = true;
+  document.getElementById('sendLog').textContent = '';
+  document.getElementById('sendProgress').style.display = 'block';
+
+  const CHUNK = 1000;
+  let sent = 0, failed = 0;
+  const chunks = [];
+  for (let i = 0; i < recipients.length; i += CHUNK) chunks.push(recipients.slice(i, i + CHUNK));
+  for (let i = 0; i < chunks.length; i++) {
+    log(`📤 נתח ${i + 1}/${chunks.length} (${chunks[i].length} נמענים)...`);
+    try {
+      const res = await api(FN_SEND, { ...cfg, recipients: chunks[i], dryRun: false });
+      sent += res.sent || 0;
+      failed += (res.errors || []).length;
+      log(`   ✅ נשלחו ${res.sent} ${res.errors?.length ? '⚠️ שגיאות: ' + res.errors.join('; ') : ''}`);
+    } catch (e) {
+      failed++;
+      log(`   ❌ נתח נכשל: ${e.message}`);
+    }
+    document.getElementById('progFill').style.width = Math.round((i + 1) / chunks.length * 100) + '%';
+  }
+  log(`🏁 סיום: ${sent}/${total} נשלחו בקמפיין "${cfg.campaign}"`);
+  toast(`🏁 ${sent}/${total} נשלחו`);
+  btn.disabled = false;
+  loadCampaigns();
+}
+
+async function loadCampaigns() {
+  const body = document.getElementById('campaignsBody');
+  try {
+    const { campaigns } = await api(FN_ADMIN, { action: 'campaigns' });
+    if (!campaigns.length) { body.innerHTML = '<tr><td colspan="8" class="empty">אין קמפיינים עדיין</td></tr>'; return; }
+    body.innerHTML = campaigns.map(c => {
+      const ctr = c.sent_count ? Math.round(c.unique_clickers / c.sent_count * 1000) / 10 : 0;
+      return `<tr>
+        <td><strong>${esc(c.campaign_name)}</strong></td>
+        <td>${fmtDate(c.created_at)}</td>
+        <td>${esc(c.sender || '')}</td>
+        <td class="num">${c.sent_count ?? 0}</td>
+        <td class="num">${c.clicks}</td>
+        <td class="num">${c.unique_clickers}</td>
+        <td class="num"><span class="badge green">${c.leads}</span></td>
+        <td>${ctr}%</td>
+      </tr>`;
+    }).join('');
+    const sel = document.getElementById('leadCampaignFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">כל הלידים</option>' +
+      campaigns.map(c => `<option value="${esc(c.campaign_name)}" ${c.campaign_name === cur ? 'selected' : ''}>${esc(c.campaign_name)}</option>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="8" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+
+async function loadLeads() {
+  const body = document.getElementById('leadsBody');
+  const campaign = document.getElementById('leadCampaignFilter').value;
+  try {
+    const { leads } = await api(FN_ADMIN, { action: 'leads', campaign: campaign || undefined, limit: 300 });
+    if (!leads.length) { body.innerHTML = '<tr><td colspan="6" class="empty">אין לידים</td></tr>'; return; }
+    body.innerHTML = leads.map(l => `<tr>
+      <td>${fmtDate(l.created_at)}</td>
+      <td><strong>${esc(l.name || '—')}</strong></td>
+      <td dir="ltr" style="text-align:right">${esc(l.phone)}</td>
+      <td>${esc(l.summary || '—')}</td>
+      <td>${l.hechzer_mas ? '<span class="badge green">✅ כן</span>' : '<span class="badge gray">לא</span>'}</td>
+      <td>${l.is_completed ? '<span class="badge green">הושלם</span>' : '<span class="badge gray">חלקי</span>'}${l.duplicate === 'כפול' ? ' <span class="badge red">כפול</span>' : ''}</td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="6" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+async function exportLeads() {
+  try {
+    const res = await fetch(FN_ADMIN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN },
+      body: JSON.stringify({ action: 'export_leads' }),
+    });
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    toast('הקובץ ירד');
+  } catch (e) { toast('שגיאה בייצוא'); }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+
+document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('recipInput').addEventListener('input', refreshRecipStats);
+document.getElementById('msgInput').addEventListener('input', refreshPreview);
+document.getElementById('campaignInput').addEventListener('input', refreshPreview);
+if (TOKEN) {
+  api(FN_ADMIN, { action: 'campaigns' }).then(showApp).catch(() => sessionStorage.removeItem('nahman_admin'));
+}
+</script>
+</body>
+</html>
