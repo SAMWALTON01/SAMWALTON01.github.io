@@ -5,8 +5,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ADMIN_TOKEN = 'nahman-campaign-2026-x7q';
 
-const SUPA_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPA_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Central DB (self-hosted Supabase on the client's server)
+const SUPA_URL = 'https://db.nahmanbot.com';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
 const H = { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` };
 
 const CORS = {

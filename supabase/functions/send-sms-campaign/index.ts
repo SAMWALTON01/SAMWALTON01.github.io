@@ -8,6 +8,9 @@ const INFORU_USER = 'Shimon123';
 const INFORU_TOKEN = '6ace5d6b-a0f6-42e0-9382-568fdef2ba0c';
 const INFORU_API = 'https://capi.inforu.co.il/api/v2/SMS/SendSms';
 const FUNNEL_URL = 'https://samwalton01.github.io/';
+// Central DB (self-hosted Supabase on the client's server)
+const SUPA_URL = 'https://db.nahmanbot.com';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
 const DEFAULT_SENDER = 'nahman';
 const BATCH = 500;
 // ShortenUrlEnable: Inforu replaces the long personalized link with a short
@@ -109,14 +112,12 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // Record campaign in DB (best-effort, via REST with service role env)
+  // Record campaign in the central DB (best-effort, via REST with service key)
   try {
-    const supaUrl = Deno.env.get('SUPABASE_URL');
-    const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (supaUrl && svcKey && sent > 0) {
-      await fetch(`${supaUrl}/rest/v1/sms_campaigns`, {
+    if (sent > 0) {
+      await fetch(`${SUPA_URL}/rest/v1/sms_campaigns`, {
         method: 'POST',
-        headers: { apikey: svcKey, Authorization: `Bearer ${svcKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({
           campaign_name: campaign, message_template: message, link_mode: 'phone',
           sender, sent_count: sent, status: 'sent', inforu_request_id: requestId,
