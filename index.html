@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>בדיקת זכאות להלוואה | נחמן</title>
+<title>בדיקת זכאות להחזר מס | נחמן</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -183,44 +183,33 @@ const SUPABASE_URL = 'https://db.nahmanbot.com';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgzNjI0MzI3LCJleHAiOjIwOTg5ODQzMjd9.WMx8XHApfckP3_lx6hrNBbuMup6veTwcDt66BH31FY8';
 
 /* ═══════ FLOW (baked from bot_steps, default bot) ═══════ */
+// תסריט החזר מס — משוכפל מהבוט הראשי (bot_steps ב-DB המרכזי), 19.7
 const FLOW = {
-  "start": { "type": "list", "field": "lid_type", "title": "במה התעניינת?", "description": "הלוואה או משיכה מקרן הפנסיה", "options": [
-    { "text": "הלוואה", "next": "step_worker" },
-    { "text": "משיכה מקרן הפנסיה", "next": "step_worker" } ] },
-  "step_worker": { "type": "list", "field": "worker_type", "title": "האם אתה שכיר או עצמאי?", "options": [
-    { "text": "שכיר", "next": "step_loan_amount" },
-    { "text": "עצמאי", "next": "step_loan_amount" },
-    { "text": "בין עבודות", "next": "step_loan_amount" } ] },
-  "step_loan_amount": { "type": "list", "field": "how_much_loan", "title": "כמה הלוואה אתה צריך?", "options": [
-    { "text": "עד 50 אלף", "next": "step_name" },
-    { "text": "עד 100 אלף", "next": "step_name" },
-    { "text": "100-200 אלף", "next": "step_name" },
-    { "text": "מעל 200 אלף", "next": "step_name" } ] },
-  "step_name": { "type": "text", "field": "name", "messageText": "בשמחה מה שמך המלא?", "next": "step_area" },
-  "step_area": { "type": "list", "field": "ezor", "title": "תודה ומאיפה אתה בארץ בבקשה?", "options": [
-    { "text": "צפון", "next": "step_property" },
-    { "text": "מרכז", "next": "step_property" },
-    { "text": "דרום", "next": "step_property" },
-    { "text": "ירושלים", "next": "step_property" },
-    { "text": "שפלה", "next": "step_property" } ] },
-  "step_property": { "type": "list", "field": "neches", "title": "האם יש בבעלותך נכס?", "options": [
-    { "text": "יש לי נכס", "next": "step_car" },
-    { "text": "אין לי נכס", "next": "step_car" } ] },
-  "step_car": { "type": "list", "field": "car", "title": "האם יש בבעלותך רכב משנת 2013?", "options": [
-    { "text": "יש לי רכב מעל שנת 2013", "next": "step_charges" },
-    { "text": "אין לי רכב", "next": "step_charges" } ] },
-  "step_charges": { "type": "list", "field": "hyuvim", "title": "האם חזרו לך חיובים בחצי שנה האחרונה?", "options": [
-    { "text": "כן חזרו לי חיובים", "next": "step_lien" },
-    { "text": "לא חזרו לי חיובים", "next": "step_lien" } ] },
-  "step_lien": { "type": "list", "field": "ikul", "title": "האם יש עיקול בחשבון הבנק שלכם כרגע?", "options": [
-    { "text": "כן יש לי עיקול", "next": "step_card" },
-    { "text": "לא אין לי עיקול", "next": "step_card" } ] },
-  "step_card": { "type": "list", "field": "card_type", "title": "מה יש בבעלותכם כרטיס אשראי או דיירקט חיוב מייד?", "options": [
-    { "text": "כרטיס אשראי", "next": "step_tax_refund" },
-    { "text": "כרטיס דיירקט", "next": "step_tax_refund" } ] },
-  "step_tax_refund": { "type": "list", "field": "did_hechzer", "title": "האם תהיה מעוניין שנבדוק לך זכאות ללא עלות על החזר מס?", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף לאדם", "options": [
-    { "text": "כן אשמח לבדוק", "next": "step_thanks" },
+  "start": { "type": "list", "field": "chack_hechzer", "title": "היי! 👋 שנבדוק לך זכאות להחזר מס — בחינם וללא התחייבות?", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף ₪ לאדם", "options": [
+    { "text": "תבדקו לי זכאות להחזר מס", "next": "step_working_time" },
     { "text": "לא רוצה לבדוק החזר מס", "next": "step_thanks" } ] },
+  "step_working_time": { "type": "list", "field": "working_time", "title": "כמה זמן אתה עובד באותה העבודה?", "options": [
+    { "text": "שנה", "next": "step_did_return" },
+    { "text": "מעל שנתיים", "next": "step_did_return" },
+    { "text": "מעל 5 שנים", "next": "step_did_return" } ] },
+  "step_did_return": { "type": "list", "field": "did_hechzer", "title": "האם ביצעת בשנתיים האחרונות החזר מס?", "options": [
+    { "text": "כן ביצעתי החזר מס", "next": "step_income" },
+    { "text": "לא ביצעתי החזר מס", "next": "step_income" } ] },
+  "step_income": { "type": "list", "field": "income", "title": "כמה אתה מכניס בחודש?", "options": [
+    { "text": "מעל 5 אלף", "next": "step_insurance" },
+    { "text": "מעל 8 אלף", "next": "step_insurance" },
+    { "text": "מעל 10 אלף", "next": "step_insurance" },
+    { "text": "מעל 17 אלף", "next": "step_insurance" } ] },
+  "step_insurance": { "type": "list", "field": "has_insurance", "title": "האם יש לך ביטוחים פרטיים או ביטוח משכנתא?", "options": [
+    { "text": "כן יש לי ביטוחים", "next": "step_name" },
+    { "text": "לא אין לי ביטוחים", "next": "step_name" } ] },
+  "step_name": { "type": "text", "field": "name", "messageText": "מעולה 🙌 מה שמך המלא?", "next": "step_area" },
+  "step_area": { "type": "list", "field": "ezor", "title": "תודה! ומאיפה אתה בארץ בבקשה?", "options": [
+    { "text": "צפון", "next": "step_thanks" },
+    { "text": "מרכז", "next": "step_thanks" },
+    { "text": "דרום", "next": "step_thanks" },
+    { "text": "ירושלים", "next": "step_thanks" },
+    { "text": "שפלה", "next": "step_thanks" } ] },
   "step_thanks": { "type": "text", "field": null, "messageText": "תודה רבה! קיבלנו את פרטיך ונציג יחזור אליך בהקדם 🙏", "isComplete": true }
 };
 const START_STEP = 'start';
@@ -273,7 +262,7 @@ async function submitLead() {
   const payload = {
     p_phone: state.phone,
     p_name: state.fields.name || state.name || null,
-    p_fields: state.fields,
+    p_fields: { lid_type: 'החזר מס', ...state.fields },
     p_flow_path: state.path,
     p_completed: true,
   };
@@ -284,7 +273,7 @@ async function submitLead() {
 }
 
 /* ═══════════════ PERSISTENCE (refresh-resume) ═══════════════ */
-const LS_KEY = 'nahman_funnel_v1';
+const LS_KEY = 'nahman_funnel_v2'; // v2: tax-refund script (old saved sessions reference removed steps)
 const LS_TTL = 24 * 60 * 60 * 1000; // resume window: 24h, matches server-side dedup
 
 function saveState() {
@@ -325,7 +314,7 @@ function savePartial() {
     rpc('submit_web_lead', {
       p_phone: state.phone,
       p_name: state.fields.name || state.name || null,
-      p_fields: state.fields,
+      p_fields: { lid_type: 'החזר מס', ...state.fields },
       p_flow_path: state.path,
       p_completed: false,
     }).catch(() => {});
