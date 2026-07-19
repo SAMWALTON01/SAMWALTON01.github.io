@@ -7,7 +7,7 @@ const ADMIN_TOKEN = 'nahman-campaign-2026-x7q';
 const INFORU_USER = 'Shimon123';
 const INFORU_TOKEN = '6ace5d6b-a0f6-42e0-9382-568fdef2ba0c';
 const INFORU_API = 'https://capi.inforu.co.il/api/v2/SMS/SendSms';
-const FUNNEL_URL = 'https://samwalton01.github.io/';
+const FUNNEL_URL = 'https://nahmanbot.com/';
 // Central DB (self-hosted Supabase on the client's server)
 const SUPA_URL = 'https://db.nahmanbot.com';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
