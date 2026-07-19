@@ -22,17 +22,23 @@
                                    └─────────┬────────────────┘
                                              │ RPC בלבד (anon key)
                                              ▼
-                                   ┌──────────────────────────┐
-                                   │  Supabase                │
-                                   │  ├─ Postgres + RPCs      │
-                                   │  └─ Edge Functions:      │
-                                   │     send-sms-campaign    │ ──► Inforu API
-                                   │     admin-api            │ ◄── דשבורד (x-admin-token)
-                                   │     inforu-probe         │
-                                   └──────────────────────────┘
+              ┌───────────────────────────────────────────────────────┐
+              │  DB מרכזי: Supabase self-hosted על שרת הלקוח          │
+              │  db.nahmanbot.com (Kong → Postgres, 13K+ לידים)       │
+              │  הפאנל כותב לידים ישירות לטבלת leads המרכזית          │
+              └───────────────────────────────────────────────────────┘
+                                             ▲
+              ┌──────────────────────────────┴───────────────────────┐
+              │  Supabase Cloud — רק Edge Functions (תשתית בלבד):    │
+              │   send-sms-campaign ──► Inforu API                   │
+              │   admin-api ◄── דשבורד (x-admin-token)               │
+              │  שתיהן מדברות אל ה-DB המרכזי ב-service key שלו       │
+              └──────────────────────────────────────────────────────┘
 ```
 
-אפס שרתים, אפס עלות (GitHub Pages + Supabase free tier).
+ה-DB המרכזי הוא **אותו DB שהבוט וה-CRM של הלקוח עובדים איתו** — ליד מהפאנל נולד
+ישירות בטבלת `leads` שהם רואים. פונקציות ה-edge נשארו בענן (צריכות גישת אינטרנט
+יציבה ל-Inforu + HTTPS מהדשבורד) אבל אין בהן שום דאטה — רק קוד.
 
 ## 3. רכיבי המערכת
 
@@ -50,8 +56,10 @@
 
 | מה | ערך | היכן מוגדר |
 |---|---|---|
-| Supabase project | `dgmygsvwemgtnvmdnwnz` | — |
-| anon key (ציבורי, מוגבל ל-2 RPCs) | בראש `index.html` (`SUPABASE_ANON`) | `index.html` |
+| DB מרכזי (self-hosted) | `https://db.nahmanbot.com` | בכל הרכיבים |
+| anon key של ה-DB המרכזי | בראש `index.html` (`SUPABASE_ANON`) — מקור: `/root/supabase/.env` בשרת | `index.html` |
+| service key של ה-DB המרכזי | `SUPA_KEY` בשתי הפונקציות — מקור: `/root/supabase/.env` בשרת | `send-sms-campaign`, `admin-api` |
+| Supabase Cloud (תשתית functions בלבד) | `dgmygsvwemgtnvmdnwnz` | — |
 | סיסמת דשבורד / admin token | `nahman-campaign-2026-x7q` | `ADMIN_TOKEN` בכל 3 הפונקציות |
 | Inforu | user: `Shimon123` / token: בקוד הפונקציה | `send-sms-campaign/index.ts` |
 | Sender ID | `nahman` (אומת מול ה-API) | פרמטר `sender` / `DEFAULT_SENDER` |
@@ -65,7 +73,7 @@
 **נוסח הודעת ברירת מחדל:** `DEFAULT_MESSAGE` ב-`send-sms-campaign/index.ts`
 (בדשבורד עצמו עורכים חופשי לכל קמפיין).
 
-**שאלות הפאנל:** עורכים את `FLOW` ב-`index.html`. שדות נשמרים לפי `field` —
+**שאלות הפאנל:** עורכים את `FLOW` ב-`index.html`. שדות נשמרים בפי `field` —
 השמות חייבים להתאים לעמודות בטבלת `leads` (רשימה מלאה ב-`submit_web_lead`).
 
 **כתובת הפאנל בלינקים:** `FUNNEL_URL` ב-`send-sms-campaign/index.ts`.
@@ -81,6 +89,18 @@
 הלינק האישי הארוך (~110 תווים) לבדו שורף כמעט 2 סגמנטים. לכן `SHORTEN_URL=true`
 ב-`send-sms-campaign/index.ts` — מופעל `ShortenUrlEnable` של Inforu, שמחליף כל URL
 בהודעה בלינק קצר (~20 תווים) לפני השליחה. לכבות רק אם רוצים לינק גלוי.
+
+**מעבר ל-DB מרכזי (בוצע 19.7):** מיגרציה `004_central_integration.sql` הורצה על
+ה-Postgres בשרת (גיבוי סכמה: `/root/backups/pre-integration-2026-07-19.sql`).
+היא מוסיפה: `sms_clicks`, `sms_campaigns`, `contacts` + ויו `contact_group_counts`
++ ה-RPCs (`log_web_click`, `submit_web_lead`, `calc_summary_web`) + 2 טריגרים.
+הכל אדיטיבי — לא נגענו בטבלאות/דאטה/קוד של הבוט.
+
+> ⚠️ **פעולה נדרשת מהמתכנת של הלקוח:** להסיר את ה-Custom Domain `db.nahmanbot.com`
+> מהפרויקט הישן ב-Supabase Cloud (Settings → Custom Domains). כל עוד הוא מוגדר שם,
+> חלק מצומדי ה-edge של Supabase ממשיכים לנתב אליו בקשות ל-hostname הזה (ה-DNS
+> הציבורי כבר מצביע לשרת ועובד תקין מהדפדפן). הפרויקט הענן הישן נשאר רק כתשתית
+> להרצת הפונקציות — בלי דאטה.
 
 ## 6. פריסה (Deployment)
 
@@ -128,3 +148,4 @@ delete from leads where source = 'web_funnel' and phone in ('0501234567');
 - קבוצות: שמירה (כולל דה-דופ ונרמול טלפונים), עדכון קבוצה קיימת, צפייה, מחיקת קבוצה/איש קשר, טעינה לטאב שליחה
 - רענון באמצע הפאנל: היסטוריה מלאה + המשך מאותה שאלה; ליד חלקי ב-DB תוך שניות; השלמה אחרי רענון מעדכנת את אותה שורה (is_completed=true, summary + hechzer_mas תקינים, בלי כפילויות); רענון אחרי סיום מציג את הצ'אט המושלם
 - הרשאות: ה-anon key **לא** יכול לקרוא/לכתוב אף טבלה — רק 2 ה-RPCs המסוננים
+- אינטגרציית DB מרכזי: לחיצה + ליד חלקי מהפאנל נרשמו ישירות ב-Postgres בשרת (אומת ב-psql), CORS דרך Kong תקין, מיגרציית 004 הורצה בטרנזקציה אחת עם COMMIT נקי
