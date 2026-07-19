@@ -16,9 +16,9 @@
 
 ```
 ┌─────────────────┐   לינק אישי    ┌──────────────────────────┐
-│  Inforu (סמס)   │ ─────────────► │  GitHub Pages (סטטי)     │
-└─────────────────┘  ?p=&n=&c=     │  index.html  = פאנל      │
-                                   │  admin.html  = דשבורד    │
+│  Inforu (סמס)   │ ─────────────► │  nahmanbot.com (nginx    │
+└─────────────────┘  ?p=&n=&c=     │  בשרת; GitHub Pages =    │
+                                   │  גיבוי) פאנל + דשבורד    │
                                    └─────────┬────────────────┘
                                              │ RPC בלבד (anon key)
                                              ▼
@@ -77,7 +77,9 @@
 **שאלות הפאנל:** עורכים את `FLOW` ב-`index.html`. שדות נשמרים בפי `field` —
 השמות חייבים להתאים לעמודות בטבלת `leads` (רשימה מלאה ב-`submit_web_lead`).
 
-**כתובת הפאנל בלינקים:** `FUNNEL_URL` ב-`send-sms-campaign/index.ts`.
+**כתובת הפאנל בלינקים:** `FUNNEL_URL` ב-`send-sms-campaign/index.ts` — כרגע
+`https://nahmanbot.com/` (הפאנל מוגש מהשרת עצמו; ראה §6). הכתובת הישנה ב-GitHub
+Pages עדיין עובדת כגיבוי.
 
 **שם שולח:** שדה בדשבורד / `DEFAULT_SENDER` בפונקציה.
 
@@ -107,7 +109,12 @@
 
 ## 6. פריסה (Deployment)
 
-- **דפים סטטיים:** כל push ל-`main` → GitHub Pages מתעדכן אוטומטית (~דקה).
+- **הפאנל על הדומיין הרשמי (19.7):** `https://nahmanbot.com` מוגש מהשרת —
+  קבצים ב-`/var/www/funnel/`, בלוק nginx ב-`/etc/nginx/sites-available/funnel`
+  (server_name: `nahmanbot.com` + `start.nahmanbot.com` מוכן מראש), תעודת
+  Let's Encrypt דרך certbot (חידוש אוטומטי). לעדכון: מעתיקים `index.html`/`admin.html`
+  חדשים ל-`/var/www/funnel/` — בלי restart.
+- **דפים סטטיים (גיבוי):** כל push ל-`main` → GitHub Pages מתעדכן אוטומטית (~דקה).
 - **Edge Functions בשרת:** מעתיקים את `index.ts` ל-`/root/supabase/volumes/functions/<name>/`
   ו-`docker restart supabase-edge-functions`.
 - **Edge Functions בענן — גיבוי** (אחרי `npm i -g supabase` + `supabase login`):
@@ -155,3 +162,4 @@ delete from leads where source = 'web_funnel' and phone in ('0501234567');
 - הרשאות: ה-anon key **לא** יכול לקרוא/לכתוב אף טבלה — רק 2 ה-RPCs המסוננים
 - אינטגרציית DB מרכזי: לחיצה + ליד חלקי מהפאנל נרשמו ישירות ב-Postgres בשרת (אומת ב-psql), CORS דרך Kong תקין, מיגרציית 004 הורצה בטרנזקציה אחת עם COMMIT נקי
 - פונקציות מקומיות בשרת (19.7): `admin-api` עונה `groups` תקין + 401 על טוקן שגוי, `send-sms-campaign` OPTIONS 204 — אומת ששרת ה-edge-runtime המקומי בלוגים; שום רכיב במערכת הראשית (בוט/דשבורד) לא מפנה לפרויקט הענן הישן (אומת ב-grep מלא)
+- פאנל על דומיין רשמי (19.7): `https://nahmanbot.com` + `/admin.html` עונים 200 עם תעודה תקינה והפניית http→https; `FUNNEL_URL` עודכן והופעל בשרת; crm/db/waha לא הושפעו
