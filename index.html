@@ -1,1 +1,536 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>בדיקת זכאות להלוואה | נחמן</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wa-green: #00a884;
+    --wa-green-dark: #008f6f;
+    --wa-bubble-bot: #ffffff;
+    --wa-bubble-user: #d9fdd3;
+    --wa-bg: #efeae2;
+    --text-main: #111b21;
+    --text-sub: #667781;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Heebo', system-ui, -apple-system, sans-serif;
+    background-color: var(--wa-bg);
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d5cdc2' fill-opacity='0.35'%3E%3Ccircle cx='10' cy='10' r='1.5'/%3E%3Ccircle cx='40' cy='25' r='1.5'/%3E%3Ccircle cx='25' cy='45' r='1.5'/%3E%3Ccircle cx='55' cy='50' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    max-width: 520px;
+    margin: 0 auto;
+    box-shadow: 0 0 30px rgba(0,0,0,.12);
+  }
+  /* ── Header ── */
+  header {
+    background: var(--wa-green);
+    color: #fff;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: #fff; color: var(--wa-green);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 20px; flex-shrink: 0;
+  }
+  .header-info h1 { font-size: 16px; font-weight: 600; }
+  .header-info p { font-size: 12px; opacity: .9; }
+  .progress-wrap {
+    height: 4px; background: rgba(255,255,255,.3);
+  }
+  .progress-bar {
+    height: 100%; background: #fff; width: 0%;
+    transition: width .4s ease;
+  }
+  /* ── Chat area ── */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 15.5px;
+    line-height: 1.5;
+    box-shadow: 0 1px 1px rgba(0,0,0,.08);
+    animation: pop .25s ease;
+    white-space: pre-line;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .bubble.bot { background: var(--wa-bubble-bot); align-self: flex-start; border-top-right-radius: 2px; }
+  .bubble.user { background: var(--wa-bubble-user); align-self: flex-end; border-top-left-radius: 2px; }
+  .bubble .desc { display: block; font-size: 13px; color: var(--text-sub); margin-top: 4px; }
+  .bubble .time { display: block; font-size: 10.5px; color: var(--text-sub); text-align: left; margin-top: 3px; }
+  /* typing indicator */
+  .typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+  .typing i {
+    width: 7px; height: 7px; border-radius: 50%; background: #b0b8bc;
+    animation: blink 1.2s infinite;
+  }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+  /* ── Options ── */
+  #options {
+    padding: 8px 12px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #options.show { display: flex; }
+  .opt-btn {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 24px;
+    padding: 13px 18px;
+    font-family: inherit;
+    font-size: 15.5px;
+    font-weight: 500;
+    color: var(--wa-green-dark);
+    cursor: pointer;
+    text-align: center;
+    transition: background .15s, transform .1s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  }
+  .opt-btn:active { background: #e7f6f1; transform: scale(.98); }
+  .opt-btn:disabled { opacity: .5; cursor: default; }
+  /* ── Text input ── */
+  #inputbar {
+    display: none;
+    padding: 8px 12px 14px;
+    gap: 8px;
+    align-items: center;
+  }
+  #inputbar.show { display: flex; }
+  #textInput {
+    flex: 1;
+    border: none;
+    border-radius: 24px;
+    padding: 13px 18px;
+    font-family: inherit;
+    font-size: 15.5px;
+    background: #fff;
+    outline: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  }
+  #sendBtn {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: none; background: var(--wa-green); color: #fff;
+    font-size: 20px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #sendBtn:active { background: var(--wa-green-dark); }
+  /* ── Footer note ── */
+  .footnote {
+    text-align: center; font-size: 11.5px; color: var(--text-sub);
+    padding: 6px 12px 14px;
+  }
+  /* error toast */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #333; color: #fff; padding: 10px 20px; border-radius: 20px;
+    font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none;
+    z-index: 99;
+  }
+  #toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="avatar">נ</div>
+  <div class="header-info">
+    <h1>נחמן | בדיקת זכאות</h1>
+    <p>מקוון ● עונה מיד</p>
+  </div>
+</header>
+<div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
+
+<div id="chat"></div>
+
+<div id="options"></div>
+
+<div id="inputbar">
+  <input type="text" id="textInput" placeholder="הקלד תשובה..." autocomplete="off">
+  <button id="sendBtn" aria-label="שלח">➤</button>
+</div>
+
+<div class="footnote">השיחה מאובטחת 🔒 הפרטים משמשים לבדיקת זכאות בלבד</div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════ CONFIG ═══════════════ */
+const SUPABASE_URL = 'https://db.nahmanbot.com';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgzNjI0MzI3LCJleHAiOjIwOTg5ODQzMjd9.WMx8XHApfckP3_lx6hrNBbuMup6veTwcDt66BH31FY8';
+
+/* ═══════ FLOW (baked from bot_steps, default bot) ═══════ */
+const FLOW = {
+  "start": { "type": "list", "field": "lid_type", "title": "במה התעניינת?", "description": "הלוואה או משיכה מקרן הפנסיה", "options": [
+    { "text": "הלוואה", "next": "step_worker" },
+    { "text": "משיכה מקרן הפנסיה", "next": "step_worker" } ] },
+  "step_worker": { "type": "list", "field": "worker_type", "title": "האם אתה שכיר או עצמאי?", "options": [
+    { "text": "שכיר", "next": "step_loan_amount" },
+    { "text": "עצמאי", "next": "step_loan_amount" },
+    { "text": "בין עבודות", "next": "step_loan_amount" } ] },
+  "step_loan_amount": { "type": "list", "field": "how_much_loan", "title": "כמה הלוואה אתה צריך?", "options": [
+    { "text": "עד 50 אלף", "next": "step_name" },
+    { "text": "עד 100 אלף", "next": "step_name" },
+    { "text": "100-200 אלף", "next": "step_name" },
+    { "text": "מעל 200 אלף", "next": "step_name" } ] },
+  "step_name": { "type": "text", "field": "name", "messageText": "בשמחה מה שמך המלא?", "next": "step_area" },
+  "step_area": { "type": "list", "field": "ezor", "title": "תודה ומאיפה אתה בארץ בבקשה?", "options": [
+    { "text": "צפון", "next": "step_property" },
+    { "text": "מרכז", "next": "step_property" },
+    { "text": "דרום", "next": "step_property" },
+    { "text": "ירושלים", "next": "step_property" },
+    { "text": "שפלה", "next": "step_property" } ] },
+  "step_property": { "type": "list", "field": "neches", "title": "האם יש בבעלותך נכס?", "options": [
+    { "text": "יש לי נכס", "next": "step_car" },
+    { "text": "אין לי נכס", "next": "step_car" } ] },
+  "step_car": { "type": "list", "field": "car", "title": "האם יש בבעלותך רכב משנת 2013?", "options": [
+    { "text": "יש לי רכב מעל שנת 2013", "next": "step_charges" },
+    { "text": "אין לי רכב", "next": "step_charges" } ] },
+  "step_charges": { "type": "list", "field": "hyuvim", "title": "האם חזרו לך חיובים בחצי שנה האחרונה?", "options": [
+    { "text": "כן חזרו לי חיובים", "next": "step_lien" },
+    { "text": "לא חזרו לי חיובים", "next": "step_lien" } ] },
+  "step_lien": { "type": "list", "field": "ikul", "title": "האם יש עיקול בחשבון הבנק שלכם כרגע?", "options": [
+    { "text": "כן יש לי עיקול", "next": "step_card" },
+    { "text": "לא אין לי עיקול", "next": "step_card" } ] },
+  "step_card": { "type": "list", "field": "card_type", "title": "מה יש בבעלותכם כרטיס אשראי או דיירקט חיוב מייד?", "options": [
+    { "text": "כרטיס אשראי", "next": "step_tax_refund" },
+    { "text": "כרטיס דיירקט", "next": "step_tax_refund" } ] },
+  "step_tax_refund": { "type": "list", "field": "did_hechzer", "title": "האם תהיה מעוניין שנבדוק לך זכאות ללא עלות על החזר מס?", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף לאדם", "options": [
+    { "text": "כן אשמח לבדוק", "next": "step_thanks" },
+    { "text": "לא רוצה לבדוק החזר מס", "next": "step_thanks" } ] },
+  "step_thanks": { "type": "text", "field": null, "messageText": "תודה רבה! קיבלנו את פרטיך ונציג יחזור אליך בהקדם 🙏", "isComplete": true }
+};
+const START_STEP = 'start';
+const TOTAL_STEPS = 12;
+
+/* ═══════════════ STATE ═══════════════ */
+const urlParams = new URLSearchParams(location.search);
+const state = {
+  phone: normalizePhone(urlParams.get('p') || ''),
+  name: (urlParams.get('n') || '').trim(),
+  campaign: (urlParams.get('c') || '').trim(),
+  fields: {},
+  path: [],
+  answers: [],   // [{stepId, answer}] — the source of truth for resume
+  stepCount: 0,
+  done: false,
+};
+
+function normalizePhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.startsWith('0')) d = '972' + d.slice(1);
+  return /^972\d{8,9}$/.test(d) ? d : '';
+}
+
+/* ═══════════════ SUPABASE RPC ═══════════════ */
+async function rpc(fn, payload) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON,
+      'Authorization': `Bearer ${SUPABASE_ANON}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`${fn} failed: ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
+function logClick() {
+  rpc('log_web_click', {
+    p_phone: state.phone,
+    p_name: state.name || null,
+    p_campaign: state.campaign || null,
+    p_user_agent: navigator.userAgent,
+  }).catch(() => {}); // fire-and-forget, never block the UX
+}
+
+async function submitLead() {
+  const payload = {
+    p_phone: state.phone,
+    p_name: state.fields.name || state.name || null,
+    p_fields: state.fields,
+    p_flow_path: state.path,
+    p_completed: true,
+  };
+  try { await rpc('submit_web_lead', payload); }
+  catch (e) { // one retry, then give up silently (user already sees thanks)
+    try { await rpc('submit_web_lead', payload); } catch (_) {}
+  }
+}
+
+/* ═══════════════ PERSISTENCE (refresh-resume) ═══════════════ */
+const LS_KEY = 'nahman_funnel_v1';
+const LS_TTL = 24 * 60 * 60 * 1000; // resume window: 24h, matches server-side dedup
+
+function saveState() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      phone: state.phone,
+      name: state.name,
+      campaign: state.campaign,
+      answers: state.answers,
+      currentStepId,
+      done: state.done,
+      ts: Date.now(),
+    }));
+  } catch (_) {}
+  savePartial();
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.ts || Date.now() - s.ts > LS_TTL) { localStorage.removeItem(LS_KEY); return null; }
+    return s;
+  } catch (_) { return null; }
+}
+
+function clearState() { try { localStorage.removeItem(LS_KEY); } catch (_) {} }
+
+// Debounced partial save to the server: even a mid-flow quitter becomes a
+// "partial" lead (24h upsert keeps it one row; dashboard shows "חלקי").
+let partialTimer = null;
+function savePartial() {
+  if (!state.phone || state.done) return;
+  clearTimeout(partialTimer);
+  partialTimer = setTimeout(() => {
+    if (state.done) return; // completed submit already fired — never overwrite with partial
+    rpc('submit_web_lead', {
+      p_phone: state.phone,
+      p_name: state.fields.name || state.name || null,
+      p_fields: state.fields,
+      p_flow_path: state.path,
+      p_completed: false,
+    }).catch(() => {});
+  }, 800);
+}
+
+// Rebuild fields/path + instantly re-render the whole chat history from FLOW.
+function restoreSession(saved) {
+  state.phone = state.phone || saved.phone || '';
+  state.name = state.name || saved.name || '';
+  state.campaign = state.campaign || saved.campaign || '';
+  state.answers = Array.isArray(saved.answers) ? saved.answers : [];
+  state.done = !!saved.done;
+  for (const a of state.answers) {
+    const st = FLOW[a.stepId];
+    if (!st) continue;
+    addBubble(st.title || st.messageText || '', 'bot', st.description || null);
+    addBubble(a.answer, 'user');
+    if (st.field) state.fields[st.field] = a.answer;
+    state.path.push(a.stepId);
+  }
+  state.stepCount = state.answers.length;
+  setProgress();
+}
+
+/* ═══════════════ UI ═══════════════ */
+const chat = document.getElementById('chat');
+const optionsBox = document.getElementById('options');
+const inputbar = document.getElementById('inputbar');
+const textInput = document.getElementById('textInput');
+const sendBtn = document.getElementById('sendBtn');
+const progress = document.getElementById('progress');
+
+function nowTime() {
+  return new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+function scrollDown() { chat.scrollTop = chat.scrollHeight; }
+
+function addBubble(text, who, desc) {
+  const b = document.createElement('div');
+  b.className = `bubble ${who}`;
+  b.textContent = text;
+  if (desc) {
+    const d = document.createElement('span');
+    d.className = 'desc'; d.textContent = desc;
+    b.appendChild(d);
+  }
+  const t = document.createElement('span');
+  t.className = 'time'; t.textContent = nowTime();
+  b.appendChild(t);
+  chat.appendChild(b);
+  scrollDown();
+}
+
+function showTyping(cb, delay = 650) {
+  const b = document.createElement('div');
+  b.className = 'bubble bot';
+  b.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+  chat.appendChild(b);
+  scrollDown();
+  setTimeout(() => { b.remove(); cb(); }, delay);
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function setProgress() {
+  progress.style.width = Math.min(100, Math.round(state.stepCount / TOTAL_STEPS * 100)) + '%';
+}
+
+/* ═══════════════ FLOW ENGINE ═══════════════ */
+function renderStep(stepId) {
+  const step = FLOW[stepId];
+  if (!step) return;
+  state.stepCount++;
+  setProgress();
+
+  const text = step.title || step.messageText || '';
+  showTyping(() => {
+    addBubble(text, 'bot', step.description || null);
+    if (step.isComplete) {
+      finishFlow(stepId);
+    } else if (step.type === 'list') {
+      renderOptions(step);
+    } else {
+      renderTextInput(step);
+    }
+  });
+}
+
+function renderOptions(step) {
+  inputbar.classList.remove('show');
+  optionsBox.innerHTML = '';
+  step.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = opt.text;
+    btn.onclick = () => {
+      optionsBox.querySelectorAll('button').forEach(b => b.disabled = true);
+      addBubble(opt.text, 'user');
+      if (step.field) state.fields[step.field] = opt.text;
+      state.answers.push({ stepId: currentStepId, answer: opt.text });
+      state.path.push(currentStepId);
+      optionsBox.classList.remove('show');
+      const next = opt.next || step.next;
+      currentStepId = next;
+      saveState();
+      setTimeout(() => renderStep(next), 350);
+    };
+    optionsBox.appendChild(btn);
+  });
+  optionsBox.classList.add('show');
+  scrollDown();
+}
+
+function renderTextInput(step) {
+  optionsBox.classList.remove('show');
+  inputbar.classList.add('show');
+  textInput.value = (step.field === 'name' && state.name) ? state.name : '';
+  textInput.focus();
+  const submit = () => {
+    const val = textInput.value.trim();
+    if (val.length < 2) { toast('נא להזין תשובה'); return; }
+    addBubble(val, 'user');
+    if (step.field) state.fields[step.field] = val;
+    state.answers.push({ stepId: currentStepId, answer: val });
+    state.path.push(currentStepId);
+    inputbar.classList.remove('show');
+    const next = step.next;
+    currentStepId = next;
+    saveState();
+    setTimeout(() => renderStep(next), 350);
+  };
+  sendBtn.onclick = submit;
+  textInput.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+}
+
+async function finishFlow(stepId) {
+  state.path.push(stepId);
+  state.done = true;
+  progress.style.width = '100%';
+  clearTimeout(partialTimer);
+  saveState(); // keep the completed view on refresh (24h), no duplicate rows server-side
+  await submitLead();
+}
+
+/* ═══════════════ PHONE GATE (no ?p= in URL) ═══════════════ */
+function askPhone() {
+  addBubble('שלום! 👋 כדי להתחיל את בדיקת הזכאות, מה מספר הטלפון שלך?', 'bot');
+  inputbar.classList.add('show');
+  textInput.type = 'tel';
+  textInput.placeholder = '050-0000000';
+  textInput.focus();
+  const submit = () => {
+    const p = normalizePhone(textInput.value);
+    if (!p) { toast('מספר לא תקין, נסה שוב'); return; }
+    state.phone = p;
+    addBubble(textInput.value.trim(), 'user');
+    inputbar.classList.remove('show');
+    logClick();
+    saveState();
+    textInput.type = 'text';
+    textInput.placeholder = 'הקלד תשובה...';
+    setTimeout(() => { currentStepId = START_STEP; renderStep(START_STEP); }, 350);
+  };
+  sendBtn.onclick = submit;
+  textInput.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+}
+
+/* ═══════════════ BOOT ═══════════════ */
+let currentStepId = START_STEP;
+window.addEventListener('DOMContentLoaded', () => {
+  const saved = loadState();
+  let resume = false;
+  if (saved) {
+    if (state.phone && saved.phone && state.phone !== saved.phone) {
+      clearState(); // a different recipient opened a link on this device
+    } else if (!saved.done || (saved.answers || []).length) {
+      resume = true;
+    }
+  }
+
+  if (resume) {
+    restoreSession(saved);
+    logClick();
+    if (state.done) {
+      // already finished — show the completed chat as-is
+      const th = FLOW['step_thanks'];
+      if (th) addBubble(th.messageText, 'bot');
+      progress.style.width = '100%';
+    } else {
+      currentStepId = FLOW[saved.currentStepId] ? saved.currentStepId : START_STEP;
+      renderStep(currentStepId); // re-ask the question where they stopped
+    }
+  } else if (state.phone) {
+    logClick();
+    renderStep(START_STEP);
+  } else {
+    askPhone();
+  }
+});
+</script>
+</body>
+</html>
