@@ -10,6 +10,9 @@ const INFORU_API = 'https://capi.inforu.co.il/api/v2/SMS/SendSms';
 const FUNNEL_URL = 'https://samwalton01.github.io/';
 const DEFAULT_SENDER = 'nahman';
 const BATCH = 500;
+// ShortenUrlEnable: Inforu replaces the long personalized link with a short
+// one (~25 chars) per recipient → fewer SMS segments = lower cost.
+const SHORTEN_URL = true;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -90,7 +93,7 @@ Deno.serve(async (req: Request) => {
           Data: {
             Message: message,
             Recipients: batch,
-            Settings: { Sender: sender, CampaignName: campaign, ShortenUrlEnable: false, AllowDuplicates: true },
+            Settings: { Sender: sender, CampaignName: campaign, ShortenUrlEnable: SHORTEN_URL, AllowDuplicates: true },
           },
         }),
       });
