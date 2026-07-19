@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-// admin-api — read-side API for the self-service dashboard.
-// Auth: X-Admin-Token header. All reads are server-side with the service key.
+// admin-api — read/write API for the self-service dashboard.
+// Auth: X-Admin-Token header. All DB access is server-side with the service key.
 
 const ADMIN_TOKEN = 'nahman-campaign-2026-x7q';
 
@@ -21,15 +21,27 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function q(path: string) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: H });
+async function q(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { ...H, ...(init.headers || {}) },
+  });
   if (!res.ok) throw new Error(`db ${res.status}: ${await res.text()}`);
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function csvEscape(v: unknown): string {
   const s = v == null ? '' : String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toLocalPhone(phone: string): string {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('972')) return '0' + d.slice(3);
+  if (d.startsWith('0')) return d;
+  if (d.length === 9 && d.startsWith('5')) return '0' + d;
+  return d;
 }
 
 Deno.serve(async (req: Request) => {
@@ -87,6 +99,64 @@ Deno.serve(async (req: Request) => {
     return new Response(csv, {
       headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="leads.csv"', ...CORS },
     });
+  }
+
+  // ══════════ GROUPS / CONTACTS ══════════
+
+  // ── groups: list with counts ──
+  if (action === 'groups') {
+    const rows = await q('contact_group_counts?select=*&order=group_name');
+    return json({ groups: rows });
+  }
+
+  // ── group_contacts: contacts of one group ──
+  if (action === 'group_contacts') {
+    const g = encodeURIComponent(String(body.group || ''));
+    const rows = await q(`contacts?group_name=eq.${g}&select=id,phone,name,created_at&order=id&limit=20000`);
+    return json({ contacts: rows });
+  }
+
+  // ── save_contacts: bulk upsert into a group (dedup on phone+group) ──
+  if (action === 'save_contacts') {
+    const group = String(body.group || '').trim();
+    if (!group) return json({ error: 'missing group' }, 400);
+    const input: Array<{ phone: string; name?: string }> = body.contacts || [];
+    const seen = new Set<string>();
+    const rows: Array<{ phone: string; name: string | null; group_name: string }> = [];
+    let skipped = 0;
+    for (const r of input) {
+      const p = toLocalPhone(r.phone);
+      if (!/^05\d{8}$/.test(p)) { skipped++; continue; }
+      if (seen.has(p)) continue;
+      seen.add(p);
+      rows.push({ phone: p, name: (r.name || '').trim() || null, group_name: group });
+    }
+    let saved = 0;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      // on_conflict targets the unique(phone, group_name) constraint — re-saving
+      // an existing phone updates its name instead of erroring.
+      await q('contacts?on_conflict=phone,group_name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(chunk),
+      });
+      saved += chunk.length;
+    }
+    return json({ saved, skipped, group });
+  }
+
+  // ── delete_group ──
+  if (action === 'delete_group') {
+    const g = encodeURIComponent(String(body.group || ''));
+    await q(`contacts?group_name=eq.${g}`, { method: 'DELETE' });
+    return json({ deleted: true, group: body.group });
+  }
+
+  // ── delete_contact ──
+  if (action === 'delete_contact') {
+    await q(`contacts?id=eq.${Number(body.id)}`, { method: 'DELETE' });
+    return json({ deleted: true });
   }
 
   return json({ error: 'unknown action' }, 400);
