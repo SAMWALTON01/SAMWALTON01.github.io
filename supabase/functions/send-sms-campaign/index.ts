@@ -13,9 +13,10 @@ const SUPA_URL = 'https://db.nahmanbot.com';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
 const DEFAULT_SENDER = 'nahman';
 const BATCH = 500;
-// ShortenUrlEnable: Inforu replaces the long personalized link with a short
-// one (~25 chars) per recipient → fewer SMS segments = lower cost.
-const SHORTEN_URL = true;
+// ShortenUrlEnable DISABLED 19.7: messages with it were silently not delivered
+// (feature likely not active on the Inforu account). Re-enable only after
+// Inforu support confirms the shortener is live for this account.
+const SHORTEN_URL = false;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +48,7 @@ function buildLink(phone: string, name: string, campaign: string): string {
 
 const DEFAULT_MESSAGE = [
   'שלום [#FirstName#],',
-  'בדיקת זכאות מהירה להלוואה בתנאים מועדפים — ללא התחייבות:',
+  'בדיקת זכאות מהירה להחזר מס — ללא התחייבות:',
   '[#Representative#]',
   'להסרה השב: הסר',
 ].join('\n');
