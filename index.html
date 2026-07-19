@@ -234,6 +234,7 @@ const state = {
   campaign: (urlParams.get('c') || '').trim(),
   fields: {},
   path: [],
+  answers: [],   // [{stepId, answer}] — the source of truth for resume
   stepCount: 0,
   done: false,
 };
@@ -280,6 +281,74 @@ async function submitLead() {
   catch (e) { // one retry, then give up silently (user already sees thanks)
     try { await rpc('submit_web_lead', payload); } catch (_) {}
   }
+}
+
+/* ═══════════════ PERSISTENCE (refresh-resume) ═══════════════ */
+const LS_KEY = 'nahman_funnel_v1';
+const LS_TTL = 24 * 60 * 60 * 1000; // resume window: 24h, matches server-side dedup
+
+function saveState() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      phone: state.phone,
+      name: state.name,
+      campaign: state.campaign,
+      answers: state.answers,
+      currentStepId,
+      done: state.done,
+      ts: Date.now(),
+    }));
+  } catch (_) {}
+  savePartial();
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.ts || Date.now() - s.ts > LS_TTL) { localStorage.removeItem(LS_KEY); return null; }
+    return s;
+  } catch (_) { return null; }
+}
+
+function clearState() { try { localStorage.removeItem(LS_KEY); } catch (_) {} }
+
+// Debounced partial save to the server: even a mid-flow quitter becomes a
+// "partial" lead (24h upsert keeps it one row; dashboard shows "חלקי").
+let partialTimer = null;
+function savePartial() {
+  if (!state.phone || state.done) return;
+  clearTimeout(partialTimer);
+  partialTimer = setTimeout(() => {
+    if (state.done) return; // completed submit already fired — never overwrite with partial
+    rpc('submit_web_lead', {
+      p_phone: state.phone,
+      p_name: state.fields.name || state.name || null,
+      p_fields: state.fields,
+      p_flow_path: state.path,
+      p_completed: false,
+    }).catch(() => {});
+  }, 800);
+}
+
+// Rebuild fields/path + instantly re-render the whole chat history from FLOW.
+function restoreSession(saved) {
+  state.phone = state.phone || saved.phone || '';
+  state.name = state.name || saved.name || '';
+  state.campaign = state.campaign || saved.campaign || '';
+  state.answers = Array.isArray(saved.answers) ? saved.answers : [];
+  state.done = !!saved.done;
+  for (const a of state.answers) {
+    const st = FLOW[a.stepId];
+    if (!st) continue;
+    addBubble(st.title || st.messageText || '', 'bot', st.description || null);
+    addBubble(a.answer, 'user');
+    if (st.field) state.fields[st.field] = a.answer;
+    state.path.push(a.stepId);
+  }
+  state.stepCount = state.answers.length;
+  setProgress();
 }
 
 /* ═══════════════ UI ═══════════════ */
@@ -362,10 +431,13 @@ function renderOptions(step) {
       optionsBox.querySelectorAll('button').forEach(b => b.disabled = true);
       addBubble(opt.text, 'user');
       if (step.field) state.fields[step.field] = opt.text;
+      state.answers.push({ stepId: currentStepId, answer: opt.text });
       state.path.push(currentStepId);
       optionsBox.classList.remove('show');
       const next = opt.next || step.next;
-      setTimeout(() => { currentStepId = next; renderStep(next); }, 350);
+      currentStepId = next;
+      saveState();
+      setTimeout(() => renderStep(next), 350);
     };
     optionsBox.appendChild(btn);
   });
@@ -383,10 +455,13 @@ function renderTextInput(step) {
     if (val.length < 2) { toast('נא להזין תשובה'); return; }
     addBubble(val, 'user');
     if (step.field) state.fields[step.field] = val;
+    state.answers.push({ stepId: currentStepId, answer: val });
     state.path.push(currentStepId);
     inputbar.classList.remove('show');
     const next = step.next;
-    setTimeout(() => { currentStepId = next; renderStep(next); }, 350);
+    currentStepId = next;
+    saveState();
+    setTimeout(() => renderStep(next), 350);
   };
   sendBtn.onclick = submit;
   textInput.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
@@ -396,6 +471,8 @@ async function finishFlow(stepId) {
   state.path.push(stepId);
   state.done = true;
   progress.style.width = '100%';
+  clearTimeout(partialTimer);
+  saveState(); // keep the completed view on refresh (24h), no duplicate rows server-side
   await submitLead();
 }
 
@@ -413,6 +490,7 @@ function askPhone() {
     addBubble(textInput.value.trim(), 'user');
     inputbar.classList.remove('show');
     logClick();
+    saveState();
     textInput.type = 'text';
     textInput.placeholder = 'הקלד תשובה...';
     setTimeout(() => { currentStepId = START_STEP; renderStep(START_STEP); }, 350);
@@ -424,7 +502,29 @@ function askPhone() {
 /* ═══════════════ BOOT ═══════════════ */
 let currentStepId = START_STEP;
 window.addEventListener('DOMContentLoaded', () => {
-  if (state.phone) {
+  const saved = loadState();
+  let resume = false;
+  if (saved) {
+    if (state.phone && saved.phone && state.phone !== saved.phone) {
+      clearState(); // a different recipient opened a link on this device
+    } else if (!saved.done || (saved.answers || []).length) {
+      resume = true;
+    }
+  }
+
+  if (resume) {
+    restoreSession(saved);
+    logClick();
+    if (state.done) {
+      // already finished — show the completed chat as-is
+      const th = FLOW['step_thanks'];
+      if (th) addBubble(th.messageText, 'bot');
+      progress.style.width = '100%';
+    } else {
+      currentStepId = FLOW[saved.currentStepId] ? saved.currentStepId : START_STEP;
+      renderStep(currentStepId); // re-ask the question where they stopped
+    }
+  } else if (state.phone) {
     logClick();
     renderStep(START_STEP);
   } else {
