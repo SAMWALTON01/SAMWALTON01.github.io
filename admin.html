@@ -13,6 +13,7 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Heebo', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  /* ── login ── */
   #loginScreen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .login-card { background: var(--card); border-radius: 16px; padding: 40px; width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,.08); text-align: center; }
   .login-card .logo { width: 64px; height: 64px; border-radius: 50%; background: var(--green); color: #fff; font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
@@ -23,6 +24,7 @@
   .login-card button { width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--green); color: #fff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
   .login-card button:hover { background: var(--green-dark); }
   .login-err { color: var(--red); font-size: 13px; margin-top: 10px; display: none; }
+  /* ── app shell ── */
   #app { display: none; max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
   .topbar .brand { display: flex; align-items: center; gap: 10px; }
@@ -48,16 +50,20 @@
   .btn-primary { background: var(--green); color: #fff; }
   .btn-primary:hover { background: var(--green-dark); }
   .btn-secondary { background: #eef2f5; color: var(--text); }
+  .btn-danger-text { background: none; color: var(--red); font-size: 13px; padding: 6px; }
   .btn:disabled { opacity: .5; cursor: default; }
-  #recipStats { display: flex; gap: 14px; margin: 10px 0; font-size: 14px; flex-wrap: wrap; }
+  /* recipients */
+  #recipStats, .stat-row { display: flex; gap: 14px; margin: 10px 0; font-size: 14px; flex-wrap: wrap; }
   .stat-pill { background: #eef2f5; border-radius: 20px; padding: 5px 14px; }
   .stat-pill.ok { background: #e3f5ef; color: var(--green-dark); font-weight: 600; }
   .stat-pill.bad { background: #fdecea; color: var(--red); }
   #previewBox { background: #f7f9fa; border: 1px dashed var(--border); border-radius: 10px; padding: 14px; font-size: 14px; white-space: pre-line; margin-top: 8px; }
+  /* progress */
   #sendProgress { display: none; margin-top: 16px; }
   .prog-track { height: 10px; background: #eef2f5; border-radius: 6px; overflow: hidden; }
   .prog-fill { height: 100%; background: var(--green); width: 0%; transition: width .3s; }
   #sendLog { font-size: 13px; color: var(--sub); margin-top: 10px; max-height: 180px; overflow-y: auto; white-space: pre-line; }
+  /* tables */
   table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   th { text-align: right; padding: 10px 12px; color: var(--sub); font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
   td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -78,6 +84,7 @@
 </head>
 <body>
 
+<!-- ═══ LOGIN ═══ -->
 <div id="loginScreen">
   <div class="login-card">
     <div class="logo">נ</div>
@@ -89,6 +96,7 @@
   </div>
 </div>
 
+<!-- ═══ APP ═══ -->
 <div id="app">
   <div class="topbar">
     <div class="brand"><div class="logo">נ</div><h1>דשבורד קמפיינים</h1></div>
@@ -99,8 +107,10 @@
     <button class="tab active" data-tab="send" onclick="switchTab('send')">📤 שליחת קמפיין</button>
     <button class="tab" data-tab="campaigns" onclick="switchTab('campaigns')">📈 קמפיינים</button>
     <button class="tab" data-tab="leads" onclick="switchTab('leads')">👥 לידים</button>
+    <button class="tab" data-tab="groups" onclick="switchTab('groups')">📇 קבוצות</button>
   </div>
 
+  <!-- ── SEND ── -->
   <div class="panel active" id="panel-send">
     <div class="card">
       <h2>רשימת נמענים</h2>
@@ -109,9 +119,11 @@
         <textarea id="recipInput" rows="6" placeholder="0501234567, ישראל כהן&#10;0527654321, דנה לוי&#10;0541112222"></textarea>
         <div class="hint">פורמטים נתמכים: <code>טלפון, שם</code> / <code>טלפון שם</code> / טלפון בלבד • עד 10,000 נמענים</div>
       </div>
-      <div class="field">
+      <div class="field" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <input type="file" id="fileInput" accept=".csv,.txt" style="display:none" onchange="loadFile(event)">
         <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📁 העלאת קובץ</button>
+        <select id="groupPicker" style="width:auto; min-width:180px;"><option value="">טען מקבוצה שמורה...</option></select>
+        <button class="btn btn-secondary" onclick="loadGroupIntoSend()">⬇️ טען קבוצה</button>
       </div>
       <div id="recipStats"></div>
     </div>
@@ -151,6 +163,7 @@
     </div>
   </div>
 
+  <!-- ── CAMPAIGNS ── -->
   <div class="panel" id="panel-campaigns">
     <div class="card">
       <div class="toolbar">
@@ -169,6 +182,7 @@
     </div>
   </div>
 
+  <!-- ── LEADS ── -->
   <div class="panel" id="panel-leads">
     <div class="card">
       <div class="toolbar">
@@ -189,6 +203,60 @@
       </div>
     </div>
   </div>
+
+  <!-- ── GROUPS ── -->
+  <div class="panel" id="panel-groups">
+    <div class="card">
+      <h2>שמירת קבוצה חדשה / עדכון קבוצה</h2>
+      <div class="field">
+        <label>שם הקבוצה</label>
+        <input type="text" id="groupNameInput" placeholder="למשל: לקוחות_יולי">
+        <div class="hint">שמירה לאותה קבוצה מעדכנת אותה — מספר שכבר קיים מתעדכן, לא מוכפל</div>
+      </div>
+      <div class="field">
+        <label>אנשי קשר (שורה לכל אחד: טלפון, שם) או העלה קובץ CSV</label>
+        <textarea id="groupRecipInput" rows="6" placeholder="0501234567, ישראל כהן&#10;0527654321, דנה לוי"></textarea>
+      </div>
+      <div class="field" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="file" id="groupFileInput" accept=".csv,.txt" style="display:none" onchange="loadGroupFile(event)">
+        <button class="btn btn-secondary" onclick="document.getElementById('groupFileInput').click()">📁 העלאת קובץ</button>
+        <button class="btn btn-primary" id="saveGroupBtn" onclick="saveGroup()">💾 שמור קבוצה</button>
+      </div>
+      <div id="groupSaveStats"></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">קבוצות שמורות</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="loadGroups()">🔄 רענן</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>קבוצה</th><th>אנשי קשר</th><th>עודכן לאחרונה</th><th>פעולות</th>
+          </tr></thead>
+          <tbody id="groupsBody"><tr><td colspan="4" class="empty">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="groupContactsCard" style="display:none;">
+      <div class="toolbar">
+        <h2 style="margin:0" id="groupContactsTitle">אנשי קשר</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="sendToGroup()">📤 שלח קמפיין לקבוצה זו</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>טלפון</th><th>שם</th><th>נוסף</th><th></th>
+          </tr></thead>
+          <tbody id="groupContactsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -200,6 +268,7 @@ const FN_ADMIN = `${SUPA}/functions/v1/admin-api`;
 let TOKEN = sessionStorage.getItem('nahman_admin') || '';
 let recipients = [];
 
+/* ═══ auth ═══ */
 function doLogin() {
   TOKEN = document.getElementById('pwdInput').value.trim();
   api(FN_ADMIN, { action: 'campaigns' })
@@ -214,7 +283,7 @@ function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('campaignInput').value = 'camp_' + new Date().toISOString().slice(0, 10);
-  loadCampaigns(); loadLeads();
+  loadCampaigns(); loadLeads(); loadGroups();
 }
 async function api(url, body) {
   const res = await fetch(url, {
@@ -232,13 +301,16 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2600);
 }
 
+/* ═══ tabs ═══ */
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
   if (name === 'campaigns') loadCampaigns();
   if (name === 'leads') loadLeads();
+  if (name === 'groups') loadGroups();
 }
 
+/* ═══ recipients parsing ═══ */
 function parseRecipients(text) {
   const out = []; const bad = [];
   for (let line of text.split('\n')) {
@@ -260,6 +332,7 @@ function parseRecipients(text) {
     if (/^05\d{8}$/.test(d)) out.push({ phone: d, name });
     else bad.push(line);
   }
+  // dedup by phone, keep first
   const seen = new Set();
   const dedup = out.filter(r => seen.has(r.phone) ? false : (seen.add(r.phone), true));
   return { valid: dedup, bad, dups: out.length - dedup.length };
@@ -282,7 +355,7 @@ function loadFile(e) {
   const reader = new FileReader();
   reader.onload = () => {
     let text = reader.result;
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // strip BOM
     document.getElementById('recipInput').value = text;
     refreshRecipStats();
     toast('הקובץ נטען');
@@ -290,6 +363,7 @@ function loadFile(e) {
   reader.readAsText(f, 'utf-8');
 }
 
+/* ═══ preview ═══ */
 function buildLink(r, campaign) {
   const p = new URLSearchParams();
   p.set('p', r.phone);
@@ -306,6 +380,7 @@ function refreshPreview() {
     msg.replaceAll('[#FirstName#]', r.name || '').replaceAll('[#Representative#]', link);
 }
 
+/* ═══ dry run + send ═══ */
 function getCampaignConfig() {
   return {
     sender: document.getElementById('senderInput').value.trim() || 'nahman',
@@ -363,6 +438,7 @@ async function sendCampaign() {
   loadCampaigns();
 }
 
+/* ═══ campaigns tab ═══ */
 async function loadCampaigns() {
   const body = document.getElementById('campaignsBody');
   try {
@@ -381,6 +457,7 @@ async function loadCampaigns() {
         <td>${ctr}%</td>
       </tr>`;
     }).join('');
+    // refresh leads campaign filter
     const sel = document.getElementById('leadCampaignFilter');
     const cur = sel.value;
     sel.innerHTML = '<option value="">כל הלידים</option>' +
@@ -388,6 +465,7 @@ async function loadCampaigns() {
   } catch (e) { body.innerHTML = '<tr><td colspan="8" class="empty">שגיאה בטעינה</td></tr>'; }
 }
 
+/* ═══ leads tab ═══ */
 async function loadLeads() {
   const body = document.getElementById('leadsBody');
   const campaign = document.getElementById('leadCampaignFilter').value;
@@ -420,12 +498,119 @@ async function exportLeads() {
   } catch (e) { toast('שגיאה בייצוא'); }
 }
 
+/* ═══ groups tab ═══ */
+let currentGroup = '';
+async function loadGroups() {
+  const body = document.getElementById('groupsBody');
+  try {
+    const { groups } = await api(FN_ADMIN, { action: 'groups' });
+    // refresh send-tab picker
+    const picker = document.getElementById('groupPicker');
+    const cur = picker.value;
+    picker.innerHTML = '<option value="">טען מקבוצה שמורה...</option>' +
+      groups.map(g => `<option value="${esc(g.group_name)}" ${g.group_name === cur ? 'selected' : ''}>${esc(g.group_name)} (${g.contacts_count})</option>`).join('');
+    if (!groups.length) { body.innerHTML = '<tr><td colspan="4" class="empty">אין קבוצות שמורות עדיין</td></tr>'; return; }
+    body.innerHTML = groups.map(g => `<tr>
+      <td><strong>${esc(g.group_name)}</strong></td>
+      <td class="num">${g.contacts_count}</td>
+      <td>${fmtDate(g.last_updated)}</td>
+      <td>
+        <button class="btn btn-secondary" style="padding:6px 14px; font-size:13px;" onclick="loadGroupContacts('${esc(g.group_name).replace(/'/g, "\\'")}')">צפה</button>
+        <button class="btn btn-danger-text" onclick="deleteGroup('${esc(g.group_name).replace(/'/g, "\\'")}')">🗑️ מחק</button>
+      </td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+async function loadGroupContacts(group) {
+  currentGroup = group;
+  const card = document.getElementById('groupContactsCard');
+  card.style.display = 'block';
+  document.getElementById('groupContactsTitle').textContent = `אנשי קשר: ${group}`;
+  const body = document.getElementById('groupContactsBody');
+  body.innerHTML = '<tr><td colspan="4" class="empty">טוען...</td></tr>';
+  try {
+    const { contacts } = await api(FN_ADMIN, { action: 'group_contacts', group });
+    if (!contacts.length) { body.innerHTML = '<tr><td colspan="4" class="empty">הקבוצה ריקה</td></tr>'; return; }
+    body.innerHTML = contacts.map(c => `<tr>
+      <td dir="ltr" style="text-align:right">${esc(c.phone)}</td>
+      <td><strong>${esc(c.name || '—')}</strong></td>
+      <td>${fmtDate(c.created_at)}</td>
+      <td><button class="btn btn-danger-text" onclick="deleteContact(${c.id}, '${esc(group).replace(/'/g, "\\'")}')">🗑️</button></td>
+    </tr>`).join('');
+    card.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+async function saveGroup() {
+  const group = document.getElementById('groupNameInput').value.trim();
+  if (!group) { toast('חסר שם קבוצה'); return; }
+  const { valid } = parseRecipients(document.getElementById('groupRecipInput').value);
+  if (!valid.length) { toast('אין אנשי קשר תקינים'); return; }
+  const btn = document.getElementById('saveGroupBtn'); btn.disabled = true;
+  try {
+    const res = await api(FN_ADMIN, { action: 'save_contacts', group, contacts: valid });
+    document.getElementById('groupSaveStats').innerHTML =
+      `<div class="stat-row"><span class="stat-pill ok">✅ נשמרו ${res.saved} בקבוצה "${esc(group)}"</span>` +
+      (res.skipped ? `<span class="stat-pill bad">⚠️ ${res.skipped} לא תקינים דולגו</span>` : '') + `</div>`;
+    toast(`💾 הקבוצה "${group}" נשמרה (${res.saved})`);
+    document.getElementById('groupRecipInput').value = '';
+    loadGroups();
+  } catch (e) { toast('שגיאה בשמירה'); }
+  btn.disabled = false;
+}
+async function deleteGroup(group) {
+  if (!confirm(`למחוק את הקבוצה "${group}" וכל אנשי הקשר שבה?`)) return;
+  try {
+    await api(FN_ADMIN, { action: 'delete_group', group });
+    toast('הקבוצה נמחקה');
+    document.getElementById('groupContactsCard').style.display = 'none';
+    loadGroups();
+  } catch (e) { toast('שגיאה במחיקה'); }
+}
+async function deleteContact(id, group) {
+  try {
+    await api(FN_ADMIN, { action: 'delete_contact', id });
+    loadGroupContacts(group);
+    loadGroups();
+  } catch (e) { toast('שגיאה במחיקה'); }
+}
+function loadGroupFile(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let text = reader.result;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    document.getElementById('groupRecipInput').value = text;
+    toast('הקובץ נטען');
+  };
+  reader.readAsText(f, 'utf-8');
+}
+async function loadGroupIntoSend() {
+  const group = document.getElementById('groupPicker').value;
+  if (!group) { toast('בחר קבוצה קודם'); return; }
+  try {
+    const { contacts } = await api(FN_ADMIN, { action: 'group_contacts', group });
+    if (!contacts.length) { toast('הקבוצה ריקה'); return; }
+    document.getElementById('recipInput').value = contacts.map(c => c.name ? `${c.phone}, ${c.name}` : c.phone).join('\n');
+    refreshRecipStats();
+    toast(`⬇️ נטענו ${contacts.length} נמענים מ"${group}"`);
+  } catch (e) { toast('שגיאה בטעינת הקבוצה'); }
+}
+function sendToGroup() {
+  if (!currentGroup) return;
+  switchTab('send');
+  document.getElementById('groupPicker').value = currentGroup;
+  loadGroupIntoSend();
+}
+
+/* ═══ utils ═══ */
 function esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
 function fmtDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
 }
 
+/* ═══ boot ═══ */
 document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('recipInput').addEventListener('input', refreshRecipStats);
 document.getElementById('msgInput').addEventListener('input', refreshPreview);
