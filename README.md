@@ -47,7 +47,7 @@
 |---|---|
 | `index.html` | הפאנל ללקוחות. הפלואו (תסריט החזר מס, 7 שאלות) **מוטמע בקוד** באובייקט `FLOW` |
 | `admin.html` | דשבורד ניהול: שליחת קמפיין / סטטיסטיקות / לידים + ייצוא CSV / **קבוצות אנשי קשר** |
-| `supabase/functions/send-sms-campaign/` | שליחה דרך Inforu (שרת-צד, מוגן טוקן). `SHORTEN_URL=true` מפעיל את מקצר הקישורים של Inforu |
+| `supabase/functions/send-sms-campaign/` | שליחה דרך Inforu (שרת-צד, מוגן טוקן). `SHORTEN_URL=false` — מקצר הקישורים כבוי (גרם לבליעת הודעות, ראה §5) |
 | `supabase/functions/admin-api/` | API קריאה/כתיבה לדשבורד (קמפיינים/לידים/ייצוא/**קבוצות**) |
 | `supabase/functions/inforu-probe/` | כלי בדיקה: קישוריות + Sender IDs מורשים |
 | `supabase/migrations/` | כל ה-DDL: RPCs (`submit_web_lead`, `log_web_click`, `calc_summary_web`) + טריגרים + טבלת קבוצות |
@@ -63,7 +63,7 @@
 | Supabase Cloud (מראה מיותרת של הפונקציות — לגיבוי בלבד) | `dgmygsvwemgtnvmdnwnz` | — |
 | סיסמת דשבורד / admin token | `nahman-campaign-2026-x7q` | `ADMIN_TOKEN` בכל 3 הפונקציות |
 | Inforu | user: `Shimon123` / token: בקוד הפונקציה | `send-sms-campaign/index.ts` |
-| Sender ID | `nahman` (אומת מול ה-API) | פרמטר `sender` / `DEFAULT_SENDER` |
+| Sender ID | `nahman` (אומת מול ה-API); הלקוח משתמש גם במספרי טלפון כ-sender — שדה בדשבורד | פרמטר `sender` / `DEFAULT_SENDER` |
 
 > ⚠️ **לפני production — מומלץ לשנות** את `ADMIN_TOKEN` (בכל הפונקציות) ולסובב את
 > מפתח ה-service של Supabase (הוא נחשף בריפו הישן WhatsAppCrmClean/rebuild-flow.js).
@@ -91,10 +91,12 @@ Pages עדיין עובדת כגיבוי.
 ייחודיות על `(phone, group_name)` — שמירה חוזרת לאותה קבוצה **מעדכנת** ולא מכפילה.
 בדשבורד: טאב 📇 לניהול, ובטאב השליחה — "טען מקבוצה שמורה" שממלא את רשימת הנמענים.
 
-**קיצור לינקים (חשוב לעלות!):** הודעה בעברית = UCS-2 = **70 תווים לסגמנט**.
-הלינק האישי הארוך (~110 תווים) לבדו שורף כמעט 2 סגמנטים. לכן `SHORTEN_URL=true`
-ב-`send-sms-campaign/index.ts` — מופעל `ShortenUrlEnable` של Inforu, שמחליף כל URL
-בהודעה בלינק קצר (~20 תווים) לפני השליחה. לכבות רק אם רוצים לינק גלוי.
+**קיצור לינקים (כבוי 19.7!):** `SHORTEN_URL=false` ב-`send-sms-campaign/index.ts`.
+בדיקת A/B הוכיחה שהודעות עם `ShortenUrlEnable=true` **לא נמסרות כלל** (נבלעות
+בשתיקה אצל Inforu — הפיצ'ר כנראה לא מופעל בחשבון), בעוד הודעות רגילות מגיעות.
+להפעיל מחדש רק אחרי אישור תמיכת Inforu שהמקצר פעיל בחשבון.
+שם שולח: הלקוח משתמש ב-sender ID **מספרי** (מספר טלפון) — מזינים אותו בשדה
+"שם שולח" בדשבורד לכל קמפיין; ברירת המחדל בקוד: `DEFAULT_SENDER`.
 
 **מעבר ל-DB מרכזי (בוצע 19.7):** מיגרציה `004_central_integration.sql` הורצה על
 ה-Postgres בשרת (גיבוי סכמה: `/root/backups/pre-integration-2026-07-19.sql`).
@@ -161,7 +163,7 @@ delete from leads where source = 'web_funnel' and phone in ('0501234567');
 
 ## 10. בדיקות שבוצעו לפני המסירה ✅
 
-- שליחת 2 סמסים אמיתיים דרך Inforu — התקבלו, Sender `nahman` תקין
+- שליחת סמסים אמיתיים דרך Inforu — התקבלו ונמסרו (לינק רגיל; מקוצר נבלע — כובה)
 - לחיצה → רישום מייד (טלפון+קמפיין+user-agent) כולל זיהוי בוטים (Google-Read-Aloud)
 - מילוי מלא של 12 השאלות → ליד עם כל השדות, `summary` אוטומטי, `hechzer_mas`, דה-דופ 24 שעות
 - דשבורד: התחברות, סטטיסטיקות, לידים, ייצוא
