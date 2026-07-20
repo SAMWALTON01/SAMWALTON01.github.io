@@ -48,7 +48,7 @@ function buildLink(phone: string, name: string, campaign: string): string {
 
 const DEFAULT_MESSAGE = [
   'שלום [#FirstName#],',
-  'בדיקת זכאות מהירה להחזר מס — ללא התחייבות:',
+  'בדיקת זכאות מהירה — הלוואה או החזר מס, ללא התחייבות:',
   '[#Representative#]',
   'להסרה השב: הסר',
 ].join('\n');
