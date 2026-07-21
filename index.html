@@ -502,13 +502,16 @@ function setChatInput() {
 
 function sendRemark(text) {
   if (!state.phone) return;
-  rpc('submit_web_lead', {
+  const payload = {
     p_phone: state.phone,
     p_name: state.fields.name || state.name || null,
     p_fields: { remarks: text },
     p_flow_path: state.path,
     p_completed: false,
-  }).catch(() => {});
+  };
+  rpc('submit_web_lead', payload).catch(() => {
+    setTimeout(() => rpc('submit_web_lead', payload).catch(() => {}), 1500); // one retry — every message must reach remarks
+  });
 }
 
 function restartFlow() {
