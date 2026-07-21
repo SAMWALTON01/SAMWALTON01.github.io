@@ -45,6 +45,14 @@ function toLocalPhone(phone: string): string {
   return d;
 }
 
+function toIntlPhone(phone: string): string {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('972')) return d;
+  if (d.startsWith('0')) return '972' + d.slice(1);
+  if (d.length === 9 && d.startsWith('5')) return '972' + d;
+  return d;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
@@ -79,6 +87,29 @@ Deno.serve(async (req: Request) => {
     if (body.source) path += `&source=eq.${encodeURIComponent(String(body.source))}`;
     const rows = await q(path);
     return json({ leads: rows, total: rows.length });
+  }
+
+  // ── opt-outs: list, add, or remove numbers ──
+  if (action === 'opt_outs') {
+    const rows = await q('sms_opt_outs?select=phone,campaign_name,source,user_agent,opted_out_at&order=opted_out_at.desc&limit=5000');
+    return json({ optOuts: rows });
+  }
+
+  if (action === 'opt_out_add') {
+    const intl = toIntlPhone(body.phone);
+    if (!/^9725\d{8}$/.test(intl)) return json({ error: 'invalid phone' }, 400);
+    await q('sms_opt_outs?on_conflict=phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ phone: intl, source: 'manual_admin' }]),
+    });
+    return json({ added: true, phone: intl });
+  }
+
+  if (action === 'opt_out_remove') {
+    const intl = toIntlPhone(body.phone);
+    await q(`sms_opt_outs?phone=eq.${intl}`, { method: 'DELETE' });
+    return json({ removed: true, phone: intl });
   }
 
   // ── export_leads: CSV download ──
