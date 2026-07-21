@@ -54,39 +54,28 @@ Deno.serve(async (req: Request) => {
 
   // ── campaigns: list with click + lead stats ──
   if (action === 'campaigns') {
-    const camps = await q('sms_campaigns?select=*&order=created_at.desc&limit=50');
-    const clicks = await q('sms_clicks?select=campaign_name,phone');
-    const leads = await q("leads?source=eq.web_funnel&select=phone,id");
-    const leadPhones = new Set(leads.map((l: { phone: string }) => l.phone));
-    const byCamp: Record<string, { clicks: number; phones: Set<string> }> = {};
-    for (const c of clicks) {
-      const k = c.campaign_name || 'unknown';
-      byCamp[k] ??= { clicks: 0, phones: new Set() };
-      byCamp[k].clicks++;
-      byCamp[k].phones.add(c.phone);
-    }
-    const out = camps.map((c: Record<string, unknown>) => {
-      const s = byCamp[String(c.campaign_name)] || { clicks: 0, phones: new Set() };
-      let leadsCount = 0;
-      for (const p of s.phones) if (leadPhones.has(p)) leadsCount++;
-      return { ...c, clicks: s.clicks, unique_clickers: s.phones.size, leads: leadsCount };
-    });
-    return json({ campaigns: out });
+    const rows = await q('sms_campaign_stats?select=*&order=created_at.desc&limit=50');
+    return json({ campaigns: rows });
   }
 
   // ── leads: newest first, optional campaign filter (via click phones) ──
   if (action === 'leads') {
     const limit = Math.min(Number(body.limit) || 200, 1000);
     const offset = Number(body.offset) || 0;
-    let phones: string[] | null = null;
-    if (body.campaign) {
-      const cl = await q(`sms_clicks?campaign_name=eq.${encodeURIComponent(String(body.campaign))}&select=phone`);
-      phones = [...new Set(cl.map((c: { phone: string }) => c.phone))];
-      if (!phones.length) return json({ leads: [], total: 0 });
-    }
     const cols = 'id,phone,name,created_at,lid_type,worker_type,how_much_loan,ezor,neches,car,hyuvim,ikul,card_type,did_hechzer,summary,hechzer_mas,is_completed,duplicate,source';
+    if (body.campaign) {
+      const rows = await q(`rpc/admin_campaign_leads?select=${cols}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          p_campaign_name: String(body.campaign),
+          p_limit: limit,
+          p_offset: offset,
+        }),
+      });
+      return json({ leads: rows, total: rows.length });
+    }
     let path = `leads?select=${cols}&order=created_at.desc&limit=${limit}&offset=${offset}`;
-    if (phones) path += `&phone=in.(${phones.slice(0, 500).join(',')})`;
     if (body.source) path += `&source=eq.${encodeURIComponent(String(body.source))}`;
     const rows = await q(path);
     return json({ leads: rows, total: rows.length });
