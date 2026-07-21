@@ -395,9 +395,10 @@ function loadFile(e) {
 }
 
 /* ═══ preview ═══ */
+const SHORT_BASE = 'https://lc76nj.short.gy/zk';
 function buildLink() {
   // Preview only. Real tokens are generated and persisted by the server before send.
-  return `${location.origin}/?Ab3kP9xQ2Z`;
+  return `${SHORT_BASE}?t=Ab3kP9xQ2Z`;
 }
 function refreshPreview() {
   const msg = document.getElementById('msgInput').value;
@@ -406,9 +407,10 @@ function refreshPreview() {
   const link = buildLink(r, campaign);
   document.getElementById('previewBox').textContent =
     msg.replaceAll('[#FirstName#]', r.name || '').replaceAll('[#Representative#]', link);
+  const sampleShort = `${SHORT_BASE}?t=Ab3kP9xQ2Z`;
   const estimated = msg
     .replaceAll('[#FirstName#]', '')
-    .replaceAll('[#Representative#]', 'https://nahmanbot.com/?Ab3kP9xQ2Z');
+    .replaceAll('[#Representative#]', sampleShort);
   const length = estimated.length;
   const segments = length === 0 ? 0 : (length <= 70 ? 1 : Math.ceil(length / 67));
   document.getElementById('msgCount').textContent = `כ-${length} תווים • ~${segments} הודעות SMS`;
