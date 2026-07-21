@@ -2,6 +2,16 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // ── send-sms-campaign — server-side Inforu sender for the serverless funnel ──
 // Custom auth: X-Admin-Token header (JWT verification disabled intentionally).
+//
+// Large-campaign flow (10K+): the dashboard splits recipients into chunks of
+// SEND_CHUNK and calls this function once per chunk with a shared
+// `clientCampaignId` + `chunkIndex`. Per chunk we:
+//   1. register_sms_campaign     — upsert the single campaign run (idempotent)
+//   2. claim_sms_campaign_batch  — claim this chunk exactly once (recovery-safe)
+//   3. prepare_sms_batch         — mint short-link tokens + filter opt-outs (in DB)
+//   4. Inforu SendSms            — personalised token link per recipient
+//   5. finish_sms_campaign_batch — record the outcome + roll up campaign counters
+// A chunk that was already sent returns { idempotent: true } without re-sending.
 
 const ADMIN_TOKEN = 'nahman-campaign-2026-x7q';
 const INFORU_USER = 'Shimon123';
@@ -12,10 +22,9 @@ const FUNNEL_URL = 'https://nahmanbot.com/';
 const SUPA_URL = 'https://db.nahmanbot.com';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
 const DEFAULT_SENDER = 'nahman';
-const BATCH = 500;
-// ShortenUrlEnable DISABLED 19.7: messages with it were silently not delivered
-// (feature likely not active on the Inforu account). Re-enable only after
-// Inforu support confirms the shortener is live for this account.
+const SEND_CHUNK = 500;
+// ShortenUrlEnable stays OFF: we now ship our own persistent short links
+// (?<token>), and Inforu's shortener silently dropped messages on this account.
 const SHORTEN_URL = false;
 
 const CORS = {
@@ -31,27 +40,45 @@ function json(data: unknown, status = 200) {
 }
 
 function toLocalPhone(phone: string): string {
-  let d = String(phone || '').replace(/\D/g, '');
+  const d = String(phone || '').replace(/\D/g, '');
   if (d.startsWith('972')) return '0' + d.slice(3);
   if (d.startsWith('0')) return d;
   if (d.length === 9 && d.startsWith('5')) return '0' + d;
   return d;
 }
 
-function buildLink(phone: string, name: string, campaign: string): string {
-  const p = new URLSearchParams();
-  p.set('p', String(phone).replace(/\D/g, ''));
-  if (name) p.set('n', name);
-  p.set('c', campaign);
-  return `${FUNNEL_URL}?${p.toString()}`;
+// The funnel reads the whole query string as the token, e.g. `${FUNNEL_URL}?Ab3kP9xQ2Z`.
+function buildTokenLink(token: string): string {
+  return `${FUNNEL_URL}?${token}`;
+}
+
+async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPA_KEY,
+      Authorization: `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`rpc ${fn} ${res.status}: ${text}`);
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 const DEFAULT_MESSAGE = [
   'שלום [#FirstName#],',
   'בדיקת זכאות מהירה — הלוואה או החזר מס, ללא התחייבות:',
   '[#Representative#]',
-  'להסרה השב: הסר',
 ].join('\n');
+
+interface PreparedRow {
+  out_phone: string;
+  out_name: string | null;
+  out_token: string | null;
+  out_opted_out: boolean;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -61,34 +88,118 @@ Deno.serve(async (req: Request) => {
   const body = await req.json().catch(() => ({}));
   const recipients: Array<{ phone: string; name?: string }> = body.recipients || [];
   const campaign = String(body.campaign || 'rehearsal_' + new Date().toISOString().slice(0, 10));
-  const sender = String(body.sender || DEFAULT_SENDER);
-  const dryRun = body.dryRun !== false; // default: dry run! must pass dryRun:false to send
+  const sender = String(body.sender || DEFAULT_SENDER).trim() || DEFAULT_SENDER;
   const message = String(body.message || DEFAULT_MESSAGE);
+  const dryRun = body.dryRun !== false; // default: dry run! must pass dryRun:false to send
 
-  const valid: Array<{ Phone: string; FirstName: string; Representative: string }> = [];
-  const skipped: string[] = [];
-  for (const r of recipients) {
-    const phone = toLocalPhone(r.phone);
-    if (!/^05\d{8}$/.test(phone)) { skipped.push(String(r.phone)); continue; }
-    valid.push({ Phone: phone, FirstName: r.name || '', Representative: buildLink(r.phone, r.name || '', campaign) });
+  // ─────────────────────────── DRY RUN (no DB writes) ───────────────────────────
+  if (dryRun) {
+    let valid = 0;
+    const skipped: string[] = [];
+    for (const r of recipients) {
+      const phone = toLocalPhone(r.phone);
+      if (!/^05\d{8}$/.test(phone)) { skipped.push(String(r.phone)); continue; }
+      valid++;
+    }
+    // Preview link with a representative 10-char token so the char count is realistic.
+    const sampleLink = buildTokenLink('Ab3kP9xQ2Z');
+    const sampleMessage = message
+      .replace(/\[#FirstName#\]/g, recipients[0]?.name || '')
+      .replace(/\[#Representative#\]/g, sampleLink);
+    return json({
+      campaign, sender, valid, skipped, dryRun: true,
+      sampleLink, linkLength: sampleMessage.length,
+      note: 'dry run — nothing sent, no tokens minted',
+    });
   }
 
-  const summary: Record<string, unknown> = {
-    campaign, sender, valid: valid.length, skipped, dryRun,
-    sampleLink: valid[0]?.Representative || null,
-  };
-
-  if (dryRun || !valid.length) {
-    return json({ ...summary, note: 'dry run — nothing sent' });
+  // ─────────────────────────── REAL SEND (one chunk) ────────────────────────────
+  const clientCampaignId = String(body.clientCampaignId || '');
+  const chunkIndex = Number.isFinite(Number(body.chunkIndex)) ? Number(body.chunkIndex) : -1;
+  const totalRecipients = Math.max(Number(body.totalRecipients) || recipients.length, 0);
+  const totalBatches = Math.max(Number(body.totalBatches) || 1, 1);
+  if (!/^[0-9a-fA-F-]{36}$/.test(clientCampaignId) || chunkIndex < 0) {
+    return json({ error: 'missing clientCampaignId or chunkIndex' }, 400);
+  }
+  if (recipients.length > SEND_CHUNK) {
+    return json({ error: `chunk too large (max ${SEND_CHUNK})` }, 400);
+  }
+  if (!message.includes('[#Representative#]')) {
+    return json({ error: 'message must contain [#Representative#]' }, 400);
   }
 
-  const auth = btoa(`${INFORU_USER}:${INFORU_TOKEN}`);
+  // 1. Register (or find) the single campaign run — safe to call on every chunk.
+  try {
+    await rpc<number>('register_sms_campaign', {
+      p_client_campaign_id: clientCampaignId,
+      p_campaign_name: campaign,
+      p_message: message,
+      p_sender: sender,
+      p_recipient_count: totalRecipients,
+      p_total_batches: totalBatches,
+    });
+  } catch (e) {
+    return json({ status: 'error', error: `register failed: ${e}` }, 502);
+  }
+
+  // 2. Claim this chunk exactly once.
+  let claim: Record<string, unknown>;
+  try {
+    claim = await rpc<Record<string, unknown>>('claim_sms_campaign_batch', {
+      p_client_campaign_id: clientCampaignId,
+      p_chunk_index: chunkIndex,
+      p_recipient_count: recipients.length,
+    });
+  } catch (e) {
+    return json({ status: 'error', error: `claim failed: ${e}` }, 502);
+  }
+  if (claim.claimed !== true) {
+    const reason = String(claim.reason || 'error');
+    if (reason === 'already_sent') {
+      // Idempotent: chunk was completed in an earlier run — do not re-send.
+      return json({
+        idempotent: true,
+        sent: Number(claim.sent || 0),
+        failed: Number(claim.failed || 0),
+        skipped: Number(claim.skipped || 0),
+        optedOut: Number(claim.optedOut || 0),
+        status: 'sent',
+      });
+    }
+    // processing / unknown / rejected / campaign_not_found → stop the dashboard safely.
+    return json({ status: reason, reason, batch: claim }, 409);
+  }
+  const campaignId = Number(claim.campaign_id);
+
+  // 3. Mint tokens + filter opt-outs inside the DB (dedup within the chunk too).
+  let prepared: PreparedRow[];
+  try {
+    prepared = await rpc<PreparedRow[]>('prepare_sms_batch', {
+      p_campaign_id: campaignId,
+      p_campaign_name: campaign,
+      p_recipients: recipients,
+    }) || [];
+  } catch (e) {
+    await finish('rejected', 0, 0, 0, 0, null, `prepare failed: ${e}`);
+    return json({ status: 'rejected', error: `prepare failed: ${e}` }, 502);
+  }
+
+  const optedOut = prepared.filter(r => r.out_opted_out).length;
+  const invalidSkipped = Math.max(recipients.length - prepared.length, 0);
+  const valid = prepared.filter(r => !r.out_opted_out && r.out_token).map(r => ({
+    Phone: toLocalPhone(r.out_phone),
+    FirstName: r.out_name || '',
+    Representative: buildTokenLink(r.out_token as string),
+  }));
+
+  // 4. Send via Inforu (one HTTP call — chunk is already ≤ SEND_CHUNK).
   let sent = 0;
+  let failed = 0;
   let requestId: string | null = null;
-  const errors: string[] = [];
+  let sendError: string | null = null;
 
-  for (let i = 0; i < valid.length; i += BATCH) {
-    const batch = valid.slice(i, i + BATCH);
+  if (valid.length > 0) {
+    const auth = btoa(`${INFORU_USER}:${INFORU_TOKEN}`);
     try {
       const res = await fetch(INFORU_API, {
         method: 'POST',
@@ -96,36 +207,61 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           Data: {
             Message: message,
-            Recipients: batch,
+            Recipients: valid,
             Settings: { Sender: sender, CampaignName: campaign, ShortenUrlEnable: SHORTEN_URL, AllowDuplicates: true },
           },
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (data.StatusId === 1) {
-        sent += data.Data?.Recipients || batch.length;
-        requestId = data.RequestId || requestId;
+        sent = Number(data.Data?.Recipients) || valid.length;
+        requestId = data.RequestId ? String(data.RequestId) : null;
       } else {
-        errors.push(data.StatusDescription || `HTTP ${res.status}`);
+        failed = valid.length;
+        sendError = data.StatusDescription || `HTTP ${res.status}`;
       }
     } catch (e) {
-      errors.push(String(e));
+      failed = valid.length;
+      sendError = String(e);
     }
   }
 
-  // Record campaign in the central DB (best-effort, via REST with service key)
+  // 5. Record the outcome. A rejected batch stays retryable (up to 3 attempts).
+  const status = sendError ? 'rejected' : 'sent';
+  let finishResult: Record<string, unknown> | null = null;
   try {
-    if (sent > 0) {
-      await fetch(`${SUPA_URL}/rest/v1/sms_campaigns`, {
-        method: 'POST',
-        headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          campaign_name: campaign, message_template: message, link_mode: 'phone',
-          sender, sent_count: sent, status: 'sent', inforu_request_id: requestId,
-        }),
-      });
-    }
-  } catch (_) { /* never fail the response over bookkeeping */ }
+    finishResult = await finish(status, sent, failed, invalidSkipped, optedOut, requestId, sendError);
+  } catch (_) { /* counters are best-effort; never lose the send result */ }
 
-  return json({ ...summary, dryRun: false, sent, requestId, errors });
+  if (sendError) {
+    // Non-2xx so the dashboard stops; re-clicking send will re-claim & retry this chunk.
+    return json({
+      status: 'rejected', error: sendError,
+      sent, failed, skipped: invalidSkipped, optedOut,
+    }, 502);
+  }
+
+  return json({
+    idempotent: false,
+    sent, failed, skipped: invalidSkipped, optedOut,
+    requestId,
+    campaignStatus: finishResult?.status ?? null,
+  });
+
+  async function finish(
+    st: string, s: number, f: number, sk: number, oo: number,
+    reqId: string | null, err: string | null,
+  ) {
+    return await rpc<Record<string, unknown>>('finish_sms_campaign_batch', {
+      p_client_campaign_id: clientCampaignId,
+      p_chunk_index: chunkIndex,
+      p_status: st,
+      p_sent: s,
+      p_failed: f,
+      p_skipped: sk,
+      p_opted_out: oo,
+      p_request_id: reqId,
+      p_error: err,
+    });
+  }
 });
