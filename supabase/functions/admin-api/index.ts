@@ -45,6 +45,14 @@ function toLocalPhone(phone: string): string {
   return d;
 }
 
+function toIntlPhone(phone: string): string {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('972')) return d;
+  if (d.startsWith('0')) return '972' + d.slice(1);
+  if (d.length === 9 && d.startsWith('5')) return '972' + d;
+  return d;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
@@ -54,42 +62,54 @@ Deno.serve(async (req: Request) => {
 
   // ── campaigns: list with click + lead stats ──
   if (action === 'campaigns') {
-    const camps = await q('sms_campaigns?select=*&order=created_at.desc&limit=50');
-    const clicks = await q('sms_clicks?select=campaign_name,phone');
-    const leads = await q("leads?source=eq.web_funnel&select=phone,id");
-    const leadPhones = new Set(leads.map((l: { phone: string }) => l.phone));
-    const byCamp: Record<string, { clicks: number; phones: Set<string> }> = {};
-    for (const c of clicks) {
-      const k = c.campaign_name || 'unknown';
-      byCamp[k] ??= { clicks: 0, phones: new Set() };
-      byCamp[k].clicks++;
-      byCamp[k].phones.add(c.phone);
-    }
-    const out = camps.map((c: Record<string, unknown>) => {
-      const s = byCamp[String(c.campaign_name)] || { clicks: 0, phones: new Set() };
-      let leadsCount = 0;
-      for (const p of s.phones) if (leadPhones.has(p)) leadsCount++;
-      return { ...c, clicks: s.clicks, unique_clickers: s.phones.size, leads: leadsCount };
-    });
-    return json({ campaigns: out });
+    const rows = await q('sms_campaign_stats?select=*&order=created_at.desc&limit=50');
+    return json({ campaigns: rows });
   }
 
   // ── leads: newest first, optional campaign filter (via click phones) ──
   if (action === 'leads') {
     const limit = Math.min(Number(body.limit) || 200, 1000);
     const offset = Number(body.offset) || 0;
-    let phones: string[] | null = null;
-    if (body.campaign) {
-      const cl = await q(`sms_clicks?campaign_name=eq.${encodeURIComponent(String(body.campaign))}&select=phone`);
-      phones = [...new Set(cl.map((c: { phone: string }) => c.phone))];
-      if (!phones.length) return json({ leads: [], total: 0 });
-    }
     const cols = 'id,phone,name,created_at,lid_type,worker_type,how_much_loan,ezor,neches,car,hyuvim,ikul,card_type,did_hechzer,summary,hechzer_mas,is_completed,duplicate,source';
+    if (body.campaign) {
+      const rows = await q(`rpc/admin_campaign_leads?select=${cols}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          p_campaign_name: String(body.campaign),
+          p_limit: limit,
+          p_offset: offset,
+        }),
+      });
+      return json({ leads: rows, total: rows.length });
+    }
     let path = `leads?select=${cols}&order=created_at.desc&limit=${limit}&offset=${offset}`;
-    if (phones) path += `&phone=in.(${phones.slice(0, 500).join(',')})`;
     if (body.source) path += `&source=eq.${encodeURIComponent(String(body.source))}`;
     const rows = await q(path);
     return json({ leads: rows, total: rows.length });
+  }
+
+  // ── opt-outs: list, add, or remove numbers ──
+  if (action === 'opt_outs') {
+    const rows = await q('sms_opt_outs?select=phone,campaign_name,source,user_agent,opted_out_at&order=opted_out_at.desc&limit=5000');
+    return json({ optOuts: rows });
+  }
+
+  if (action === 'opt_out_add') {
+    const intl = toIntlPhone(body.phone);
+    if (!/^9725\d{8}$/.test(intl)) return json({ error: 'invalid phone' }, 400);
+    await q('sms_opt_outs?on_conflict=phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ phone: intl, source: 'manual_admin' }]),
+    });
+    return json({ added: true, phone: intl });
+  }
+
+  if (action === 'opt_out_remove') {
+    const intl = toIntlPhone(body.phone);
+    await q(`sms_opt_outs?phone=eq.${intl}`, { method: 'DELETE' });
+    return json({ removed: true, phone: intl });
   }
 
   // ── export_leads: CSV download ──

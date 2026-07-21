@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>בדיקת זכאות | נחמן</title>
+<title>בדיקת זכאות | פתרונות פיננסיים</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -157,10 +157,10 @@
 <body>
 
 <header>
-  <div class="avatar">נ</div>
+  <div class="avatar">פ</div>
   <div class="header-info">
-    <h1>נחמן | בדיקת זכאות</h1>
-    <p>מקוון ● עונה מיד</p>
+    <h1>פתרונות פיננסיים</h1>
+    <p>מקוון ● מענה מיידי</p>
   </div>
 </header>
 <div class="progress-wrap"><div class="progress-bar" id="progress"></div></div>
@@ -171,7 +171,7 @@
 
 <div id="inputbar">
   <input type="text" id="textInput" placeholder="הקלד תשובה..." autocomplete="off">
-  <button id="sendBtn" aria-label="שלח">➤</button>
+  <button type="button" id="sendBtn" aria-label="שלח">➤</button>
 </div>
 
 <div class="footnote">השיחה מאובטחת 🔒 הפרטים משמשים לבדיקת זכאות בלבד</div>
@@ -182,84 +182,110 @@
 const SUPABASE_URL = 'https://db.nahmanbot.com';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgzNjI0MzI3LCJleHAiOjIwOTg5ODQzMjd9.WMx8XHApfckP3_lx6hrNBbuMup6veTwcDt66BH31FY8';
 
-/* ═══════ FLOW (baked from bot_steps, default bot) ═══════ */
-// תפריט פתיחה: הלוואה / החזר מס (בקשת הלקוח 20.7) — שני המסלולים משוכפלים מהבוט הראשי
+/* ═══════ FLOW (baked from Orel's current default bot in the shared DB) ═══════ */
 const FLOW = {
-  "start": { "type": "list", "field": "lid_type", "title": "היי! 👋 במה נוכל לעזור לך היום?", "description": "בדיקת זכאות חינם וללא התחייבות", "options": [
-    { "text": "הלוואה", "next": "loan_worker" },
-    { "text": "החזר מס", "next": "tax_offer" } ] },
-  /* ── מסלול הלוואה ── */
-  "loan_worker": { "type": "list", "field": "worker_type", "title": "האם אתה שכיר או עצמאי?", "options": [
-    { "text": "שכיר", "next": "loan_amount" },
-    { "text": "עצמאי", "next": "loan_amount" },
+  "start": { "type": "list", "field": "lid_type", "title": "במה התעניינת בהלוואה או משיכה מקרן הפנסיה", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "הלוואה", "next": "loan_worker_type" },
+    { "text": "משיכה", "next": "withdrawal_pension_amount" },
+    { "text": "הסרה מרשימת התפוצה", "action": "opt_out" } ] },
+
+  "loan_worker_type": { "type": "list", "field": "worker_type", "title": "האם אתה שכיר או עצמאי", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "אני שכיר", "next": "loan_amount" },
+    { "text": "אני עצמאי עם עוסק מורשה", "next": "loan_amount" },
+    { "text": "אני עצמאי עם חברה בעמ", "next": "loan_amount" },
+    { "text": "פנסיונר", "next": "loan_amount" },
     { "text": "בין עבודות", "next": "loan_amount" } ] },
-  "loan_amount": { "type": "list", "field": "how_much_loan", "title": "כמה הלוואה אתה צריך?", "options": [
-    { "text": "עד 50 אלף", "next": "loan_name" },
-    { "text": "עד 100 אלף", "next": "loan_name" },
-    { "text": "100-200 אלף", "next": "loan_name" },
-    { "text": "מעל 200 אלף", "next": "loan_name" } ] },
-  "loan_name": { "type": "text", "field": "name", "messageText": "בשמחה מה שמך המלא?", "next": "loan_area" },
-  "loan_area": { "type": "list", "field": "ezor", "title": "תודה ומאיפה אתה בארץ בבקשה?", "options": [
-    { "text": "צפון", "next": "loan_property" },
-    { "text": "מרכז", "next": "loan_property" },
-    { "text": "דרום", "next": "loan_property" },
-    { "text": "ירושלים", "next": "loan_property" },
-    { "text": "שפלה", "next": "loan_property" } ] },
-  "loan_property": { "type": "list", "field": "neches", "title": "האם יש בבעלותך נכס?", "options": [
-    { "text": "יש לי נכס", "next": "loan_car" },
-    { "text": "אין לי נכס", "next": "loan_car" } ] },
-  "loan_car": { "type": "list", "field": "car", "title": "האם יש בבעלותך רכב משנת 2013?", "options": [
-    { "text": "יש לי רכב מעל שנת 2013", "next": "loan_charges" },
-    { "text": "אין לי רכב", "next": "loan_charges" } ] },
-  "loan_charges": { "type": "list", "field": "hyuvim", "title": "האם חזרו לך חיובים בחצי שנה האחרונה?", "options": [
-    { "text": "כן חזרו לי חיובים", "next": "loan_lien" },
-    { "text": "לא חזרו לי חיובים", "next": "loan_lien" } ] },
-  "loan_lien": { "type": "list", "field": "ikul", "title": "האם יש עיקול בחשבון הבנק שלכם כרגע?", "options": [
-    { "text": "כן יש לי עיקול", "next": "loan_card" },
-    { "text": "לא אין לי עיקול", "next": "loan_card" } ] },
-  "loan_card": { "type": "list", "field": "card_type", "title": "מה יש בבעלותכם כרטיס אשראי או דיירקט חיוב מייד?", "options": [
-    { "text": "כרטיס אשראי", "next": "loan_tax_offer" },
-    { "text": "כרטיס דיירקט", "next": "loan_tax_offer" } ] },
-  "loan_tax_offer": { "type": "list", "field": "did_hechzer", "title": "האם תהיה מעוניין שנבדוק לך זכאות ללא עלות על החזר מס?", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף לאדם", "options": [
-    { "text": "כן אשמח לבדוק", "next": "step_thanks" },
-    { "text": "לא רוצה לבדוק החזר מס", "next": "step_thanks" } ] },
-  /* ── מסלול החזר מס ── */
-  "tax_offer": { "type": "list", "field": "chack_hechzer", "title": "שנבדוק לך זכאות להחזר מס — בחינם וללא התחייבות?", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף ₪ לאדם", "options": [
+  "loan_amount": { "type": "list", "field": "how_much_loan", "title": "כמה הלוואה אתה צריך", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "הלוואה עד 10 אלף", "next": "ask_name_loan" },
+    { "text": "הלוואה עד 100 אלף", "next": "ask_name_loan" },
+    { "text": "הלוואה עד מליון", "next": "ask_name_loan" },
+    { "text": "הלוואה מעל מליון", "next": "ask_name_loan" } ] },
+  "ask_name_loan": { "type": "text", "field": "name", "messageText": "בשמחה מה שמך המלא", "next": "loan_area" },
+  "loan_area": { "type": "list", "field": "ezor", "title": "תודה ומאיפה אתה בארץ בבקשה", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "צפון", "next": "loan_has_property" },
+    { "text": "דרום", "next": "loan_has_property" },
+    { "text": "מרכז", "next": "loan_has_property" } ] },
+  "loan_has_property": { "type": "list", "field": "neches", "title": "האם יש בבעלותך נכס", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "כן יש לי נכס", "next": "loan_pledge_property" },
+    { "text": "לא אין לי נכס", "next": "loan_has_car" } ] },
+  "loan_pledge_property": { "type": "list", "field": "shne_neches", "title": "מעולה האם תרצה לשעבד אותו ולקחת כנגדו הלוואה", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "כן רוצה לשעבד נכס", "next": "loan_has_mortgage" },
+    { "text": "לא רוצה לשעבד", "next": "tax_return_offer" } ] },
+  "loan_has_mortgage": { "type": "list", "field": "mortgage", "title": "האם יש על הנכס כרגע משכנתא", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "יש לי משכנתא על הנכס", "next": "loan_property_value" },
+    { "text": "אין לי משכנתא על הנכס", "next": "loan_property_value" } ] },
+  "loan_property_value": { "type": "list", "field": "neches_value", "title": "מה שווי הנכס", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "שווי הנכס מתחת למליון", "next": "tax_return_offer" },
+    { "text": "שווי הנכס מעל למליון", "next": "tax_return_offer" },
+    { "text": "שווי הנכס מעל שלוש מליון", "next": "tax_return_offer" },
+    { "text": "שווי הנכס מעל 7 מליון", "next": "tax_return_offer" } ] },
+  "loan_has_car": { "type": "list", "field": "car", "title": "האם יש בבעלותך רכב משנת 2013 ?", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "יש לי רכב מעל שנת 2013", "next": "loan_returned_charges" },
+    { "text": "אין לי רכב מעל שנת 2013", "next": "loan_returned_charges" } ] },
+  "loan_returned_charges": { "type": "list", "field": "hyuvim", "title": "האם חזרו לך חיובים בחצי שנה האחרונה", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "כן חזרו לי חיובים", "next": "tax_return_offer" },
+    { "text": "לא חזרו לי חיובים", "next": "loan_has_seizure" } ] },
+  "loan_has_seizure": { "type": "list", "field": "ikul", "title": "האם יש עיקול בחשבון הבנק שלכם כרגע", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "כן יש לי עיקול", "next": "tax_return_offer" },
+    { "text": "לא אין לי עיקול", "next": "loan_card_type" } ] },
+  "loan_card_type": { "type": "list", "field": "card_type", "title": "מה יש בבעלותכם כרטיס אשראי או דיירקט חיוב מייד", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "כרטיס אשראי", "next": "tax_return_offer" },
+    { "text": "כרטיס דיירקט", "next": "tax_return_offer" } ] },
+
+  "withdrawal_pension_amount": { "type": "list", "field": "how_much_pensia", "title": "היי אתה יודע במקרה כמה כסף יש לך בפנסיה?", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "יש לי בפנסיה מעל 10 אלף", "next": "withdrawal_want_to_withdraw" },
+    { "text": "יש לי בפנסיה מעל 50 אלף", "next": "withdrawal_want_to_withdraw" },
+    { "text": "יש לי בפנסיה מעל 100 אלף", "next": "withdrawal_want_to_withdraw" },
+    { "text": "לא יודע", "next": "withdrawal_has_pension" } ] },
+  "withdrawal_has_pension": { "type": "list", "field": "yesh_pensia", "title": "פנסיה יש לך נכון?", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "כן יש לי פנסיה", "next": "withdrawal_want_to_withdraw" },
+    { "text": "לא אין לי פנסיה", "next": "tax_return_offer" } ] },
+  "withdrawal_want_to_withdraw": { "type": "list", "field": "lim_shoch", "title": "מדהים ואתה רוצה למשוך אותם?", "description": "יש לבחור את האופציה הרצויה עלייך", "options": [
+    { "text": "כן רוצה למשוך", "next": "ask_name_withdrawal" },
+    { "text": "אני לא רוצה למשוך אותם", "next": "tax_return_offer" } ] },
+  "ask_name_withdrawal": { "type": "text", "field": "name", "messageText": "מדהים מה שמך המלא בבקשה", "next": "withdrawal_seizure" },
+  "withdrawal_seizure": { "type": "list", "field": "ikul_pension", "title": "מעולה ואין לך כרגע עיקול או משהו כזה בחשבון בנק נכון ?", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
+    { "text": "יש לי עיקול בחשבון הבנק", "next": "tax_return_offer" },
+    { "text": "אין לי עיקול בחשבון הבנק", "next": "tax_return_offer" } ] },
+
+  "tax_return_offer": { "type": "list", "field": "chack_hechzer", "title": "האם תהיה מעוניין שנבדוק לך זכאות ללא עלות על החזר מס", "description": "מעל 78 אחוז מהאזרחים זכאים להחזר מס בממוצע של 8 אלף לאדם", "options": [
     { "text": "תבדקו לי זכאות להחזר מס", "next": "tax_working_time" },
-    { "text": "לא רוצה לבדוק החזר מס", "next": "step_thanks" } ] },
-  "tax_working_time": { "type": "list", "field": "working_time", "title": "כמה זמן אתה עובד באותה העבודה?", "options": [
+    { "text": "לא רוצה לבדוק החזר מס", "next": "end" } ] },
+  "tax_working_time": { "type": "list", "field": "working_time", "title": "כמה זמן אתה עובד באותה העבודה", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
     { "text": "שנה", "next": "tax_did_return" },
     { "text": "מעל שנתיים", "next": "tax_did_return" },
     { "text": "מעל 5 שנים", "next": "tax_did_return" } ] },
-  "tax_did_return": { "type": "list", "field": "did_hechzer", "title": "האם ביצעת בשנתיים האחרונות החזר מס?", "options": [
+  "tax_did_return": { "type": "list", "field": "did_hechzer", "title": "האם ביצעת בשנתיים האחרונות החזר מס?", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
     { "text": "כן ביצעתי החזר מס", "next": "tax_income" },
     { "text": "לא ביצעתי החזר מס", "next": "tax_income" } ] },
-  "tax_income": { "type": "list", "field": "income", "title": "כמה אתה מכניס בחודש?", "options": [
+  "tax_income": { "type": "list", "field": "income", "title": "כמה אתה מכניס בחודש", "description": "יש לבחור את האופציה הרלוונטית אלייך", "options": [
     { "text": "מעל 5 אלף", "next": "tax_insurance" },
     { "text": "מעל 8 אלף", "next": "tax_insurance" },
     { "text": "מעל 10 אלף", "next": "tax_insurance" },
     { "text": "מעל 17 אלף", "next": "tax_insurance" } ] },
-  "tax_insurance": { "type": "list", "field": "has_insurance", "title": "האם יש לך ביטוחים פרטיים או ביטוח משכנתא?", "options": [
-    { "text": "כן יש לי ביטוחים", "next": "tax_name" },
-    { "text": "לא אין לי ביטוחים", "next": "tax_name" } ] },
-  "tax_name": { "type": "text", "field": "name", "messageText": "מעולה 🙌 מה שמך המלא?", "next": "tax_area" },
-  "tax_area": { "type": "list", "field": "ezor", "title": "תודה! ומאיפה אתה בארץ בבקשה?", "options": [
-    { "text": "צפון", "next": "step_thanks" },
-    { "text": "מרכז", "next": "step_thanks" },
-    { "text": "דרום", "next": "step_thanks" },
-    { "text": "ירושלים", "next": "step_thanks" },
-    { "text": "שפלה", "next": "step_thanks" } ] },
-  "step_thanks": { "type": "text", "field": null, "messageText": "תודה רבה! קיבלנו את פרטיך ונציג יחזור אליך בהקדם 🙏", "isComplete": true }
+  "tax_insurance": { "type": "list", "field": "has_insurance", "title": "האם יש לך ביטוחים פרטיים או ביטוח משכנתא?", "description": "יש לבחור אופציה", "options": [
+    { "text": "כן יש לי ביטוחים", "next": "end" },
+    { "text": "לא אין לי ביטוחים", "next": "end" } ] },
+  "end": { "type": "text", "field": null, "messageText": "תודה נציגינו יחזרו אלייך בהקדם", "isComplete": true }
 };
 const START_STEP = 'start';
-const TOTAL_STEPS = 12;
+const TOTAL_STEPS = 16;
 
 /* ═══════════════ STATE ═══════════════ */
+const rawQuery = location.search.slice(1);
 const urlParams = new URLSearchParams(location.search);
+const hasLegacyParams = /(?:^|&)(?:p|n|c)=/.test(rawQuery);
+const tParamToken = urlParams.get('t');
+const queryToken = tParamToken && /^[A-Za-z0-9_-]{10,16}$/.test(tParamToken)
+  ? tParamToken
+  : (!hasLegacyParams && /^[A-Za-z0-9_-]{10,16}$/.test(rawQuery) ? rawQuery : '');
 const state = {
   phone: normalizePhone(urlParams.get('p') || ''),
   name: (urlParams.get('n') || '').trim(),
   campaign: (urlParams.get('c') || '').trim(),
+  shortToken: queryToken,
+  tokenResolved: false,
+  optedOut: false,
   fields: {},
   path: [],
   answers: [],   // [{stepId, answer}] — the source of truth for resume
@@ -270,7 +296,7 @@ const state = {
 function normalizePhone(raw) {
   let d = String(raw || '').replace(/\D/g, '');
   if (d.startsWith('0')) d = '972' + d.slice(1);
-  return /^972\d{8,9}$/.test(d) ? d : '';
+  return /^9725\d{8}$/.test(d) ? d : '';
 }
 
 /* ═══════════════ SUPABASE RPC ═══════════════ */
@@ -288,13 +314,56 @@ async function rpc(fn, payload) {
   return res.status === 204 ? null : res.json();
 }
 
+async function resolveShortToken() {
+  if (!state.shortToken) return false;
+  const result = await rpc('resolve_sms_short_link', {
+    p_token: state.shortToken,
+    p_user_agent: navigator.userAgent,
+  });
+  const phone = normalizePhone(result?.phone || '');
+  if (!result?.ok || !phone) throw new Error('invalid_short_link');
+  state.phone = phone;
+  state.name = String(result.name || '').trim();
+  state.campaign = String(result.campaign || '').trim();
+  state.optedOut = !!result.optedOut;
+  state.tokenResolved = true;
+  return true;
+}
+
 function logClick() {
+  if (state.tokenResolved) return; // resolve_sms_short_link already logged this page load
   rpc('log_web_click', {
     p_phone: state.phone,
     p_name: state.name || null,
     p_campaign: state.campaign || null,
     p_user_agent: navigator.userAgent,
   }).catch(() => {}); // fire-and-forget, never block the UX
+}
+
+async function handleOptOut() {
+  inputbar.classList.remove('show');
+  optionsBox.classList.remove('show');
+  try {
+    const result = state.shortToken
+      ? await rpc('opt_out_sms', {
+          p_token: state.shortToken,
+          p_user_agent: navigator.userAgent,
+        })
+      : await rpc('opt_out_sms_by_phone', {
+          p_phone: state.phone,
+          p_user_agent: navigator.userAgent,
+        });
+    if (!result?.ok) throw new Error(result?.reason || 'opt_out_failed');
+    state.optedOut = true;
+    state.done = true;
+    clearTimeout(partialTimer);
+    progress.style.width = '100%';
+    saveState();
+    addBubble('המספר הוסר בהצלחה מרשימת התפוצה. לא יישלחו אליו הודעות נוספות.', 'bot');
+  } catch (_) {
+    addBubble('לא הצלחנו להשלים את ההסרה כרגע. אפשר לנסות שוב בעוד רגע.', 'bot');
+    renderOptions(FLOW[START_STEP]);
+  }
 }
 
 async function submitLead() {
@@ -312,7 +381,7 @@ async function submitLead() {
 }
 
 /* ═══════════════ PERSISTENCE (refresh-resume) ═══════════════ */
-const LS_KEY = 'nahman_funnel_v3'; // v3: menu + loan/tax branches (old saved sessions reference removed steps)
+const LS_KEY = 'nahman_funnel_v4'; // v4: Orel flow + short tokens + persistent opt-out
 const LS_TTL = 24 * 60 * 60 * 1000; // resume window: 24h, matches server-side dedup
 
 function saveState() {
@@ -321,6 +390,8 @@ function saveState() {
       phone: state.phone,
       name: state.name,
       campaign: state.campaign,
+      shortToken: state.shortToken,
+      optedOut: state.optedOut,
       answers: state.answers,
       currentStepId,
       done: state.done,
@@ -365,6 +436,8 @@ function restoreSession(saved) {
   state.phone = state.phone || saved.phone || '';
   state.name = state.name || saved.name || '';
   state.campaign = state.campaign || saved.campaign || '';
+  state.shortToken = state.shortToken || saved.shortToken || '';
+  state.optedOut = !!saved.optedOut;
   state.answers = Array.isArray(saved.answers) ? saved.answers : [];
   state.done = !!saved.done;
   for (const a of state.answers) {
@@ -454,13 +527,17 @@ function renderOptions(step) {
     const btn = document.createElement('button');
     btn.className = 'opt-btn';
     btn.textContent = opt.text;
-    btn.onclick = () => {
+    btn.onclick = async () => {
       optionsBox.querySelectorAll('button').forEach(b => b.disabled = true);
       addBubble(opt.text, 'user');
+      optionsBox.classList.remove('show');
+      if (opt.action === 'opt_out') {
+        await handleOptOut();
+        return;
+      }
       if (step.field) state.fields[step.field] = opt.text;
       state.answers.push({ stepId: currentStepId, answer: opt.text });
       state.path.push(currentStepId);
-      optionsBox.classList.remove('show');
       const next = opt.next || step.next;
       currentStepId = next;
       saveState();
@@ -502,16 +579,13 @@ function setChatInput() {
 
 function sendRemark(text) {
   if (!state.phone) return;
-  const payload = {
+  rpc('submit_web_lead', {
     p_phone: state.phone,
     p_name: state.fields.name || state.name || null,
     p_fields: { remarks: text },
     p_flow_path: state.path,
     p_completed: false,
-  };
-  rpc('submit_web_lead', payload).catch(() => {
-    setTimeout(() => rpc('submit_web_lead', payload).catch(() => {}), 1500); // one retry — every message must reach remarks
-  });
+  }).catch(() => {});
 }
 
 function restartFlow() {
@@ -583,15 +657,39 @@ function askPhone() {
 
 /* ═══════════════ BOOT ═══════════════ */
 let currentStepId = START_STEP;
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  if (state.shortToken) {
+    try {
+      await resolveShortToken();
+    } catch (_) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        await resolveShortToken();
+      } catch (_) {
+        state.shortToken = '';
+        clearState();
+        addBubble('לא הצלחנו לפתוח את הקישור המקוצר. אפשר להקליד את מספר הטלפון ולהמשיך.', 'bot');
+      }
+    }
+  }
+
   const saved = loadState();
   let resume = false;
   if (saved) {
     if (state.phone && saved.phone && state.phone !== saved.phone) {
       clearState(); // a different recipient opened a link on this device
-    } else if (!saved.done || (saved.answers || []).length) {
+    } else if (!saved.done || (saved.answers || []).length || saved.optedOut) {
       resume = true;
     }
+  }
+
+  if (state.optedOut || (resume && saved.optedOut)) {
+    if (resume) restoreSession(saved);
+    state.done = true;
+    state.optedOut = true;
+    progress.style.width = '100%';
+    addBubble('המספר כבר הוסר מרשימת התפוצה ולא יישלחו אליו הודעות נוספות.', 'bot');
+    return;
   }
 
   if (resume) {
@@ -599,7 +697,7 @@ window.addEventListener('DOMContentLoaded', () => {
     logClick();
     if (state.done) {
       // already finished — show the completed chat as-is; a new message restarts
-      const th = FLOW['step_thanks'];
+      const th = FLOW['end'];
       if (th) addBubble(th.messageText, 'bot');
       progress.style.width = '100%';
       setChatInput();

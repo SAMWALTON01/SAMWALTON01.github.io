@@ -108,6 +108,7 @@
     <button class="tab" data-tab="campaigns" onclick="switchTab('campaigns')">📈 קמפיינים</button>
     <button class="tab" data-tab="leads" onclick="switchTab('leads')">👥 לידים</button>
     <button class="tab" data-tab="groups" onclick="switchTab('groups')">📇 קבוצות</button>
+    <button class="tab" data-tab="optouts" onclick="switchTab('optouts')">🚫 רשימת הסרה</button>
   </div>
 
   <!-- ── SEND ── -->
@@ -133,7 +134,7 @@
       <div class="row2">
         <div class="field">
           <label>שם שולח (Sender ID מאושר)</label>
-          <input type="text" id="senderInput" value="nahman">
+          <input type="text" id="senderInput" value="Inforu">
         </div>
         <div class="field">
           <label>שם קמפיין (למעקב)</label>
@@ -142,11 +143,11 @@
       </div>
       <div class="field">
         <label>נוסח ההודעה</label>
-        <textarea id="msgInput" rows="5">שלום [#FirstName#],
-בדיקת זכאות מהירה להלוואה בתנאים מועדפים — ללא התחייבות:
-[#Representative#]
-להסרה השב: הסר</textarea>
-        <div class="hint"><code>[#FirstName#]</code> = שם הנמען • <code>[#Representative#]</code> = הלינק האישי (חובה לכלול!) • שורת ההסרה נדרשת בחוק</div>
+        <textarea id="msgInput" rows="4">שלום [#FirstName#],
+לבדיקת זכאות או להסרה:
+[#Representative#]</textarea>
+        <div class="hint" id="msgCount">כ-0 תווים • ~0 הודעות SMS</div>
+        <div class="hint"><code>[#Representative#]</code> = קישור אישי קצר (חובה) • <code>[#FirstName#]</code> = שם הנמען (מהרשימה, פורמט: <code>טלפון, שם</code>) • הטלפון נשמר מאחורי הקישור</div>
       </div>
       <div class="field">
         <label>תצוגה מקדימה (נמען ראשון)</label>
@@ -174,9 +175,9 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>קמפיין</th><th>תאריך</th><th>שולח</th><th>נשלחו</th><th>לחיצות</th><th>לוחצים יחידים</th><th>לידים</th><th>CTR</th>
+            <th>קמפיין</th><th>תאריך</th><th>מצב</th><th>יעד</th><th>נשלחו</th><th>הוסרו</th><th>נכשלו</th><th>לחיצות</th><th>לוחצים יחידים</th><th>לידים</th><th>CTR</th>
           </tr></thead>
-          <tbody id="campaignsBody"><tr><td colspan="8" class="empty">טוען...</td></tr></tbody>
+          <tbody id="campaignsBody"><tr><td colspan="11" class="empty">טוען...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -257,6 +258,29 @@
       </div>
     </div>
   </div>
+
+  <!-- ── OPT-OUTS ── -->
+  <div class="panel" id="panel-optouts">
+    <div class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">רשימת הסרה</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="loadOptOuts()">🔄 רענן</button>
+      </div>
+      <div class="field" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="optOutPhoneInput" placeholder="0501234567" style="max-width:260px;" dir="ltr">
+        <button class="btn btn-primary" onclick="addOptOut()">➕ הוסף להסרה</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>טלפון</th><th>תאריך</th><th>מקור</th><th>פעולה</th>
+          </tr></thead>
+          <tbody id="optOutsBody"><tr><td colspan="4" class="empty">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -291,9 +315,15 @@ async function api(url, body) {
     headers: { 'Content-Type': 'application/json', 'x-admin-token': TOKEN },
     body: JSON.stringify(body),
   });
-  if (res.status === 401) throw new Error('unauthorized');
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { detail: text }; }
+  if (res.status === 401) throw Object.assign(new Error('unauthorized'), { data, status: res.status });
+  if (!res.ok) {
+    const msg = data.detail || data.error || `HTTP ${res.status}`;
+    throw Object.assign(new Error(String(msg)), { data, status: res.status });
+  }
+  return data;
 }
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -308,6 +338,7 @@ function switchTab(name) {
   if (name === 'campaigns') loadCampaigns();
   if (name === 'leads') loadLeads();
   if (name === 'groups') loadGroups();
+  if (name === 'optouts') loadOptOuts();
 }
 
 /* ═══ recipients parsing ═══ */
@@ -364,12 +395,10 @@ function loadFile(e) {
 }
 
 /* ═══ preview ═══ */
-function buildLink(r, campaign) {
-  const p = new URLSearchParams();
-  p.set('p', r.phone);
-  if (r.name) p.set('n', r.name);
-  p.set('c', campaign);
-  return `${location.origin}/?${p.toString()}`;
+const SHORT_BASE = 'https://lc76nj.short.gy/zk';
+function buildLink() {
+  // Preview only. Real tokens are generated and persisted by the server before send.
+  return `${SHORT_BASE}?t=Ab3kP9xQ2Z`;
 }
 function refreshPreview() {
   const msg = document.getElementById('msgInput').value;
@@ -378,16 +407,37 @@ function refreshPreview() {
   const link = buildLink(r, campaign);
   document.getElementById('previewBox').textContent =
     msg.replaceAll('[#FirstName#]', r.name || '').replaceAll('[#Representative#]', link);
+  const sampleShort = `${SHORT_BASE}?t=Ab3kP9xQ2Z`;
+  const estimated = msg
+    .replaceAll('[#FirstName#]', '')
+    .replaceAll('[#Representative#]', sampleShort);
+  const length = estimated.length;
+  const segments = length === 0 ? 0 : (length <= 70 ? 1 : Math.ceil(length / 67));
+  document.getElementById('msgCount').textContent = `כ-${length} תווים • ~${segments} הודעות SMS`;
 }
 
-/* ═══ dry run + send ═══ */
+/* ═══ dry run + idempotent chunked send ═══ */
+const RUN_KEY = 'nahman_campaign_run_v2';
+const SEND_CHUNK = 500;
+
 function getCampaignConfig() {
   return {
-    sender: document.getElementById('senderInput').value.trim() || 'nahman',
+    sender: document.getElementById('senderInput').value.trim() || 'Inforu',
     campaign: document.getElementById('campaignInput').value.trim() || ('camp_' + Date.now()),
     message: document.getElementById('msgInput').value,
   };
 }
+async function recipientFingerprint(list) {
+  const canonical = list.map(r => `${r.phone}\t${r.name || ''}`).join('\n');
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, '0')).join('');
+}
+function readRun() {
+  try { return JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); } catch (_) { return null; }
+}
+function saveRun(run) { localStorage.setItem(RUN_KEY, JSON.stringify(run)); }
+function clearRun() { localStorage.removeItem(RUN_KEY); }
+
 async function dryRun() {
   if (!refreshRecipStats()) { toast('אין נמענים תקינים'); return; }
   const cfg = getCampaignConfig();
@@ -395,74 +445,136 @@ async function dryRun() {
   const btn = document.getElementById('dryBtn'); btn.disabled = true;
   try {
     const res = await api(FN_SEND, { ...cfg, recipients: recipients.slice(0, 5), dryRun: true });
-    toast(`✅ תקין: ${res.valid} נמענים יעבדו, ${res.skipped.length} ידולגו`);
-    log(`🧪 בדיקה: ${res.valid} תקינים. לינק לדוגמה:\n${res.sampleLink}`);
-  } catch (e) { toast('שגיאה בבדיקה'); }
+    toast(`תקין: ${res.valid} נמענים בדוגמה`);
+    log(`בדיקה בלבד — לא נכתב ל-DB ולא נשלח.\nקישור לדוגמה: ${res.sampleLink} (${res.linkLength} תווים)`);
+  } catch (e) { toast(`שגיאה בבדיקה: ${e.message}`); }
   btn.disabled = false;
 }
 function log(line) {
   document.getElementById('sendProgress').style.display = 'block';
   document.getElementById('sendLog').textContent += line + '\n';
 }
+function setProgress(done, total) {
+  document.getElementById('progFill').style.width = Math.round((done / Math.max(total, 1)) * 100) + '%';
+}
 async function sendCampaign() {
   const total = refreshRecipStats();
   if (!total) { toast('אין נמענים תקינים'); return; }
   const cfg = getCampaignConfig();
   if (!cfg.message.includes('[#Representative#]')) { toast('חובה לכלול [#Representative#] בהודעה'); return; }
-  if (!confirm(`לשגר ${total} סמסים בקמפיין "${cfg.campaign}"?`)) return;
+
+  const fingerprint = await recipientFingerprint(recipients);
+  const chunks = [];
+  for (let i = 0; i < recipients.length; i += SEND_CHUNK) chunks.push(recipients.slice(i, i + SEND_CHUNK));
+
+  let run = readRun();
+  const sameRun = run && run.fingerprint === fingerprint && run.campaign === cfg.campaign &&
+    run.sender === cfg.sender && run.message === cfg.message && run.totalBatches === chunks.length;
+
+  if (run && !sameRun) {
+    if (!confirm('קיימת ריצה קודמת שלא הסתיימה והקלט הנוכחי שונה. לבטל אותה ולהתחיל קמפיין חדש?')) return;
+    clearRun(); run = null;
+  }
+  if (!run) {
+    if (!confirm(`לשגר קמפיין ל-${total} נמענים ב-${chunks.length} מנות? מוסרים יסוננו אוטומטית.`)) return;
+    run = {
+      clientCampaignId: crypto.randomUUID(),
+      campaign: cfg.campaign,
+      sender: cfg.sender,
+      message: cfg.message,
+      fingerprint,
+      totalRecipients: total,
+      totalBatches: chunks.length,
+      nextChunk: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      optedOut: 0,
+      startedAt: new Date().toISOString(),
+    };
+    saveRun(run);
+  } else if (!confirm(`להמשיך את הקמפיין הקיים ממנה ${run.nextChunk + 1}/${run.totalBatches}?`)) return;
 
   const btn = document.getElementById('sendBtn'); btn.disabled = true;
   document.getElementById('sendLog').textContent = '';
   document.getElementById('sendProgress').style.display = 'block';
+  setProgress(run.nextChunk, chunks.length);
 
-  const CHUNK = 1000;
-  let sent = 0, failed = 0;
-  const chunks = [];
-  for (let i = 0; i < recipients.length; i += CHUNK) chunks.push(recipients.slice(i, i + CHUNK));
-  for (let i = 0; i < chunks.length; i++) {
-    log(`📤 נתח ${i + 1}/${chunks.length} (${chunks[i].length} נמענים)...`);
-    try {
-      const res = await api(FN_SEND, { ...cfg, recipients: chunks[i], dryRun: false });
-      sent += res.sent || 0;
-      failed += (res.errors || []).length;
-      log(`   ✅ נשלחו ${res.sent} ${res.errors?.length ? '⚠️ שגיאות: ' + res.errors.join('; ') : ''}`);
-    } catch (e) {
-      failed++;
-      log(`   ❌ נתח נכשל: ${e.message}`);
+  try {
+    for (let i = run.nextChunk; i < chunks.length; i++) {
+      log(`שולח מנה ${i + 1}/${chunks.length} (${chunks[i].length} נמענים)...`);
+      let res;
+      try {
+        res = await api(FN_SEND, {
+          ...cfg,
+          recipients: chunks[i],
+          clientCampaignId: run.clientCampaignId,
+          chunkIndex: i,
+          totalRecipients: total,
+          totalBatches: chunks.length,
+          dryRun: false,
+        });
+      } catch (e) {
+        const status = e.data?.status || 'error';
+        log(`נעצר במנה ${i + 1}: ${e.message}`);
+        if (status === 'unknown') log('מצב הספק אינו ודאי — אין לשלוח מנה זו שוב אוטומטית. יש לבדוק בדשבורד לפני המשך.');
+        else log('המנה לא הושלמה. לחיצה נוספת על שיגור תנסה את אותה מנה עם אותו מזהה.');
+        toast('הקמפיין נעצר בבטחה; לא דילגנו על המנה');
+        saveRun(run);
+        return;
+      }
+
+      run.sent += Number(res.sent || 0);
+      run.failed += Number(res.failed || 0);
+      run.skipped += Array.isArray(res.skipped) ? res.skipped.length : Number(res.skipped || 0);
+      run.optedOut += Number(res.optedOut || 0);
+      run.nextChunk = i + 1;
+      saveRun(run);
+      setProgress(run.nextChunk, chunks.length);
+      log(`הושלם: ${res.sent || 0} נשלחו, ${res.optedOut || 0} מוסרים סוננו${res.idempotent ? ' (המנה כבר נשלחה בעבר; לא נשלחה שוב)' : ''}.`);
     }
-    document.getElementById('progFill').style.width = Math.round((i + 1) / chunks.length * 100) + '%';
+
+    log(`סיום: ${run.sent} נשלחו, ${run.optedOut} מוסרים סוננו, ${run.failed} נכשלו.`);
+    toast(`הקמפיין הושלם: ${run.sent} נשלחו`);
+    clearRun();
+    loadCampaigns();
+  } finally {
+    btn.disabled = false;
   }
-  log(`🏁 סיום: ${sent}/${total} נשלחו בקמפיין "${cfg.campaign}"`);
-  toast(`🏁 ${sent}/${total} נשלחו`);
-  btn.disabled = false;
-  loadCampaigns();
 }
 
 /* ═══ campaigns tab ═══ */
 async function loadCampaigns() {
   const body = document.getElementById('campaignsBody');
+  const statusLabel = { preparing: 'מכין', sending: 'שולח', sent: 'הושלם', partial: 'חלקי', attention: 'דורש בדיקה', failed: 'נכשל' };
   try {
     const { campaigns } = await api(FN_ADMIN, { action: 'campaigns' });
-    if (!campaigns.length) { body.innerHTML = '<tr><td colspan="8" class="empty">אין קמפיינים עדיין</td></tr>'; return; }
+    if (!campaigns.length) { body.innerHTML = '<tr><td colspan="11" class="empty">אין קמפיינים עדיין</td></tr>'; return; }
     body.innerHTML = campaigns.map(c => {
-      const ctr = c.sent_count ? Math.round(c.unique_clickers / c.sent_count * 1000) / 10 : 0;
+      const sent = Number(c.sent_count || 0);
+      const ctr = sent ? Math.round(Number(c.unique_clickers || 0) / sent * 1000) / 10 : 0;
+      const status = statusLabel[c.status] || c.status || '—';
+      const statusClass = c.status === 'sent' ? 'green' : (c.status === 'attention' || c.status === 'partial' ? 'red' : 'gray');
       return `<tr>
-        <td><strong>${esc(c.campaign_name)}</strong></td>
+        <td><strong>${esc(c.campaign_name)}</strong><div class="hint">${c.completed_batches || 0}/${c.total_batches || 0} מנות</div></td>
         <td>${fmtDate(c.created_at)}</td>
-        <td>${esc(c.sender || '')}</td>
-        <td class="num">${c.sent_count ?? 0}</td>
-        <td class="num">${c.clicks}</td>
-        <td class="num">${c.unique_clickers}</td>
-        <td class="num"><span class="badge green">${c.leads}</span></td>
+        <td><span class="badge ${statusClass}">${esc(status)}</span></td>
+        <td class="num">${c.recipient_count ?? 0}</td>
+        <td class="num">${sent}</td>
+        <td class="num">${c.opt_out_count ?? 0}</td>
+        <td class="num">${c.failed_count ?? 0}</td>
+        <td class="num">${c.clicks ?? 0}</td>
+        <td class="num">${c.unique_clickers ?? 0}</td>
+        <td class="num"><span class="badge green">${c.leads ?? 0}</span></td>
         <td>${ctr}%</td>
       </tr>`;
     }).join('');
-    // refresh leads campaign filter
     const sel = document.getElementById('leadCampaignFilter');
     const cur = sel.value;
+    const names = [...new Set(campaigns.map(c => c.campaign_name))];
     sel.innerHTML = '<option value="">כל הלידים</option>' +
-      campaigns.map(c => `<option value="${esc(c.campaign_name)}" ${c.campaign_name === cur ? 'selected' : ''}>${esc(c.campaign_name)}</option>`).join('');
-  } catch (e) { body.innerHTML = '<tr><td colspan="8" class="empty">שגיאה בטעינה</td></tr>'; }
+      names.map(name => `<option value="${esc(name)}" ${name === cur ? 'selected' : ''}>${esc(name)}</option>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="11" class="empty">שגיאה בטעינה</td></tr>'; }
 }
 
 /* ═══ leads tab ═══ */
@@ -573,6 +685,44 @@ async function deleteContact(id, group) {
     loadGroups();
   } catch (e) { toast('שגיאה במחיקה'); }
 }
+
+/* ═══ opt-outs tab ═══ */
+function localPhone(phone) {
+  const d = String(phone || '').replace(/\D/g, '');
+  return d.startsWith('972') ? '0' + d.slice(3) : d;
+}
+async function loadOptOuts() {
+  const body = document.getElementById('optOutsBody');
+  try {
+    const { optOuts } = await api(FN_ADMIN, { action: 'opt_outs' });
+    if (!optOuts.length) { body.innerHTML = '<tr><td colspan="4" class="empty">אין מספרים ברשימת ההסרה</td></tr>'; return; }
+    body.innerHTML = optOuts.map(o => `<tr>
+      <td dir="ltr" style="text-align:right">${esc(localPhone(o.phone))}</td>
+      <td>${fmtDate(o.opted_out_at)}</td>
+      <td>${esc(o.source || '—')}</td>
+      <td><button class="btn btn-danger-text" onclick="removeOptOut('${esc(o.phone)}')">🗑️ הסר</button></td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+async function addOptOut() {
+  const input = document.getElementById('optOutPhoneInput');
+  const phone = input.value.trim();
+  if (!phone) { toast('הזן מספר טלפון'); return; }
+  try {
+    const res = await api(FN_ADMIN, { action: 'opt_out_add', phone });
+    input.value = '';
+    toast(`נוסף להסרה: ${localPhone(res.phone)}`);
+    loadOptOuts();
+  } catch (e) { toast(e.message === 'invalid phone' ? 'מספר טלפון לא תקין' : 'שגיאה בהוספה'); }
+}
+async function removeOptOut(phone) {
+  if (!confirm(`להסיר את ${localPhone(phone)} מרשימת ההסרה?`)) return;
+  try {
+    await api(FN_ADMIN, { action: 'opt_out_remove', phone });
+    toast('המספר הוסר מהרשימה');
+    loadOptOuts();
+  } catch (e) { toast('שגיאה בהסרה'); }
+}
 function loadGroupFile(e) {
   const f = e.target.files[0];
   if (!f) return;
@@ -615,6 +765,7 @@ document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key
 document.getElementById('recipInput').addEventListener('input', refreshRecipStats);
 document.getElementById('msgInput').addEventListener('input', refreshPreview);
 document.getElementById('campaignInput').addEventListener('input', refreshPreview);
+refreshPreview();
 if (TOKEN) {
   api(FN_ADMIN, { action: 'campaigns' }).then(showApp).catch(() => sessionStorage.removeItem('nahman_admin'));
 }
