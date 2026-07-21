@@ -21,11 +21,12 @@ const FUNNEL_URL = 'https://nahmanbot.com/';
 // Central DB (self-hosted Supabase on the client's server)
 const SUPA_URL = 'https://db.nahmanbot.com';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
-const DEFAULT_SENDER = 'nahman';
+const DEFAULT_SENDER = 'Inforu';
 const SEND_CHUNK = 500;
-// ShortenUrlEnable stays OFF: we now ship our own persistent short links
-// (?<token>), and Inforu's shortener silently dropped messages on this account.
-const SHORTEN_URL = false;
+// Inforu shortens the personalised token link so the recipient sees Inforu's
+// short domain instead of the funnel domain. (Earlier message drops on this
+// account were caused by an unregistered Sender ID, not the shortener.)
+const SHORTEN_URL = true;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

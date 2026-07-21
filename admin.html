@@ -133,7 +133,7 @@
       <div class="row2">
         <div class="field">
           <label>שם שולח (Sender ID מאושר)</label>
-          <input type="text" id="senderInput" value="nahman">
+          <input type="text" id="senderInput" value="Inforu">
         </div>
         <div class="field">
           <label>שם קמפיין (למעקב)</label>
@@ -388,7 +388,7 @@ const SEND_CHUNK = 500;
 
 function getCampaignConfig() {
   return {
-    sender: document.getElementById('senderInput').value.trim() || 'nahman',
+    sender: document.getElementById('senderInput').value.trim() || 'Inforu',
     campaign: document.getElementById('campaignInput').value.trim() || ('camp_' + Date.now()),
     message: document.getElementById('msgInput').value,
   };
