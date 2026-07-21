@@ -4,7 +4,10 @@
 
 begin;
 
-create extension if not exists pgcrypto;
+-- pgcrypto lives in the `extensions` schema on Supabase; ensure it exists and is
+-- reachable by the RPCs (their search_path includes `extensions`).
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ═══════════ 1. הרחבת רשומת הקמפיין לריצה רב-מנתית אחת ═══════════
 
@@ -245,7 +248,9 @@ create or replace function public.prepare_sms_batch(
 returns table(out_phone text, out_name text, out_token text, out_opted_out boolean)
 language plpgsql
 security definer
-set search_path = public
+-- `extensions` is required so pgcrypto's gen_random_bytes() (used to mint tokens)
+-- resolves on Supabase, where pgcrypto is installed in the extensions schema.
+set search_path = public, extensions
 as $$
 declare
   r jsonb;
