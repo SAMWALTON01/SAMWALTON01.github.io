@@ -13,7 +13,7 @@ const CONFIG = {
   user: process.env.INFORU_USER || 'Shimon123',
   token: process.env.INFORU_TOKEN || '6ace5d6b-a0f6-42e0-9382-568fdef2ba0c',
   sender: process.env.INFORU_SENDER || 'nahman',
-  funnelUrl: (process.env.FUNNEL_URL || 'https://samwalton01.github.io/').replace(/\/+$/, ''),
+  funnelUrl: (process.env.FUNNEL_URL || 'https://lc76nj.short.gy/zk').replace(/\/+$/, ''),
   campaign: process.env.CAMPAIGN || 'rehearsal_' + new Date().toISOString().slice(0, 10),
   api: 'https://capi.inforu.co.il/api/v2/SMS/SendSms',
   batchSize: 500,
@@ -46,7 +46,7 @@ function buildLink(phone, name) {
   p.set('p', String(phone).replace(/\D/g, ''));
   if (name) p.set('n', name);
   p.set('c', CONFIG.campaign);
-  return `${CONFIG.funnelUrl}/?${p.toString()}`;
+  return `${CONFIG.funnelUrl}?${p.toString()}`;
 }
 
 async function main() {

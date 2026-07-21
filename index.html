@@ -275,7 +275,10 @@ const TOTAL_STEPS = 16;
 const rawQuery = location.search.slice(1);
 const urlParams = new URLSearchParams(location.search);
 const hasLegacyParams = /(?:^|&)(?:p|n|c)=/.test(rawQuery);
-const queryToken = !hasLegacyParams && /^[A-Za-z0-9_-]{10,16}$/.test(rawQuery) ? rawQuery : '';
+const tParamToken = urlParams.get('t');
+const queryToken = tParamToken && /^[A-Za-z0-9_-]{10,16}$/.test(tParamToken)
+  ? tParamToken
+  : (!hasLegacyParams && /^[A-Za-z0-9_-]{10,16}$/.test(rawQuery) ? rawQuery : '');
 const state = {
   phone: normalizePhone(urlParams.get('p') || ''),
   name: (urlParams.get('n') || '').trim(),

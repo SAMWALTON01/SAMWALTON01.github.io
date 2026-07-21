@@ -18,6 +18,9 @@ const INFORU_USER = 'Shimon123';
 const INFORU_TOKEN = '6ace5d6b-a0f6-42e0-9382-568fdef2ba0c';
 const INFORU_API = 'https://capi.inforu.co.il/api/v2/SMS/SendSms';
 const FUNNEL_URL = 'https://nahmanbot.com/';
+// Public Short.io master link — redirects to FUNNEL_URL with the token in the query.
+// The funnel reads the token from ?t=<token> (Short.io normalises bare ?token to token= otherwise).
+const SHORT_BASE = 'https://lc76nj.short.gy/zk';
 // Central DB (self-hosted Supabase on the client's server)
 const SUPA_URL = 'https://db.nahmanbot.com';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODM2MjQzMjcsImV4cCI6MjA5ODk4NDMyN30.2sCfWoZlggpq9uel-e9P_OppsR6NP8xdVvbIAI0d9NM';
@@ -48,9 +51,9 @@ function toLocalPhone(phone: string): string {
   return d;
 }
 
-// The funnel reads the whole query string as the token, e.g. `${FUNNEL_URL}?Ab3kP9xQ2Z`.
+// The funnel reads the token from ?t=<token> so Short.io doesn't normalise it to token=.
 function buildTokenLink(token: string): string {
-  return `${FUNNEL_URL}?${token}`;
+  return `${SHORT_BASE}?t=${token}`;
 }
 
 async function rpc<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
