@@ -108,6 +108,7 @@
     <button class="tab" data-tab="campaigns" onclick="switchTab('campaigns')">📈 קמפיינים</button>
     <button class="tab" data-tab="leads" onclick="switchTab('leads')">👥 לידים</button>
     <button class="tab" data-tab="groups" onclick="switchTab('groups')">📇 קבוצות</button>
+    <button class="tab" data-tab="optouts" onclick="switchTab('optouts')">🚫 רשימת הסרה</button>
   </div>
 
   <!-- ── SEND ── -->
@@ -145,6 +146,7 @@
         <textarea id="msgInput" rows="4">שלום,
 לבדיקת זכאות או להסרה:
 [#Representative#]</textarea>
+        <div class="hint" id="msgCount">כ-0 תווים • ~0 הודעות SMS</div>
         <div class="hint"><code>[#Representative#]</code> = קישור אישי קצר (חובה) • הטלפון נשמר מאחורי הקישור • במסך הראשון קיימת אפשרות הסרה אמיתית</div>
       </div>
       <div class="field">
@@ -256,6 +258,29 @@
       </div>
     </div>
   </div>
+
+  <!-- ── OPT-OUTS ── -->
+  <div class="panel" id="panel-optouts">
+    <div class="card">
+      <div class="toolbar">
+        <h2 style="margin:0">רשימת הסרה</h2>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary" onclick="loadOptOuts()">🔄 רענן</button>
+      </div>
+      <div class="field" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="optOutPhoneInput" placeholder="0501234567" style="max-width:260px;" dir="ltr">
+        <button class="btn btn-primary" onclick="addOptOut()">➕ הוסף להסרה</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>טלפון</th><th>תאריך</th><th>מקור</th><th>פעולה</th>
+          </tr></thead>
+          <tbody id="optOutsBody"><tr><td colspan="4" class="empty">טוען...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -313,6 +338,7 @@ function switchTab(name) {
   if (name === 'campaigns') loadCampaigns();
   if (name === 'leads') loadLeads();
   if (name === 'groups') loadGroups();
+  if (name === 'optouts') loadOptOuts();
 }
 
 /* ═══ recipients parsing ═══ */
@@ -380,6 +406,12 @@ function refreshPreview() {
   const link = buildLink(r, campaign);
   document.getElementById('previewBox').textContent =
     msg.replaceAll('[#FirstName#]', r.name || '').replaceAll('[#Representative#]', link);
+  const estimated = msg
+    .replaceAll('[#FirstName#]', '')
+    .replaceAll('[#Representative#]', 'https://nahmanbot.com/?Ab3kP9xQ2Z');
+  const length = estimated.length;
+  const segments = length === 0 ? 0 : (length <= 70 ? 1 : Math.ceil(length / 67));
+  document.getElementById('msgCount').textContent = `כ-${length} תווים • ~${segments} הודעות SMS`;
 }
 
 /* ═══ dry run + idempotent chunked send ═══ */
@@ -651,6 +683,44 @@ async function deleteContact(id, group) {
     loadGroups();
   } catch (e) { toast('שגיאה במחיקה'); }
 }
+
+/* ═══ opt-outs tab ═══ */
+function localPhone(phone) {
+  const d = String(phone || '').replace(/\D/g, '');
+  return d.startsWith('972') ? '0' + d.slice(3) : d;
+}
+async function loadOptOuts() {
+  const body = document.getElementById('optOutsBody');
+  try {
+    const { optOuts } = await api(FN_ADMIN, { action: 'opt_outs' });
+    if (!optOuts.length) { body.innerHTML = '<tr><td colspan="4" class="empty">אין מספרים ברשימת ההסרה</td></tr>'; return; }
+    body.innerHTML = optOuts.map(o => `<tr>
+      <td dir="ltr" style="text-align:right">${esc(localPhone(o.phone))}</td>
+      <td>${fmtDate(o.opted_out_at)}</td>
+      <td>${esc(o.source || '—')}</td>
+      <td><button class="btn btn-danger-text" onclick="removeOptOut('${esc(o.phone)}')">🗑️ הסר</button></td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="empty">שגיאה בטעינה</td></tr>'; }
+}
+async function addOptOut() {
+  const input = document.getElementById('optOutPhoneInput');
+  const phone = input.value.trim();
+  if (!phone) { toast('הזן מספר טלפון'); return; }
+  try {
+    const res = await api(FN_ADMIN, { action: 'opt_out_add', phone });
+    input.value = '';
+    toast(`נוסף להסרה: ${localPhone(res.phone)}`);
+    loadOptOuts();
+  } catch (e) { toast(e.message === 'invalid phone' ? 'מספר טלפון לא תקין' : 'שגיאה בהוספה'); }
+}
+async function removeOptOut(phone) {
+  if (!confirm(`להסיר את ${localPhone(phone)} מרשימת ההסרה?`)) return;
+  try {
+    await api(FN_ADMIN, { action: 'opt_out_remove', phone });
+    toast('המספר הוסר מהרשימה');
+    loadOptOuts();
+  } catch (e) { toast('שגיאה בהסרה'); }
+}
 function loadGroupFile(e) {
   const f = e.target.files[0];
   if (!f) return;
@@ -693,6 +763,7 @@ document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key
 document.getElementById('recipInput').addEventListener('input', refreshRecipStats);
 document.getElementById('msgInput').addEventListener('input', refreshPreview);
 document.getElementById('campaignInput').addEventListener('input', refreshPreview);
+refreshPreview();
 if (TOKEN) {
   api(FN_ADMIN, { action: 'campaigns' }).then(showApp).catch(() => sessionStorage.removeItem('nahman_admin'));
 }
